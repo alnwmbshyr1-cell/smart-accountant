@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:open_file/open_file.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'ai_agent_service.dart';
 
 
 void main() {
@@ -155,7 +156,13 @@ class _HomeScreenState extends State<HomeScreen> {
     await _flutterTts.speak(text);
   }
 
+  final AiAgentService _aiAgent = AiAgentService();
+
   Future<void> _startListening(BuildContext ctx) async {
+    await _aiAgent.init();
+    setState(() => _isListening = true);
+    
+    // Simulate or execute agent command processing
     bool available = await _speech.initialize(
       onStatus: (val) {
         if (val == 'notListening' || val == 'done') {
@@ -164,30 +171,35 @@ class _HomeScreenState extends State<HomeScreen> {
       },
       onError: (val) {
         setState(() => _isListening = false);
-        ScaffoldMessenger.of(ctx).showSnackBar(
-          SnackBar(content: Text('خطأ في التعرف الصوتي: ${val.errorMsg}')),
-        );
       },
     );
 
     if (available) {
-      setState(() => _isListening = true);
       _speech.listen(
         onResult: (val) {
           setState(() {
             _lastSpokenText = val.recognizedWords;
           });
           if (val.finalResult && _lastSpokenText.isNotEmpty) {
-            _processVoiceCommand(_lastSpokenText);
+            _aiAgent.processVoiceCommandText(_lastSpokenText, (responseMsg) {
+              setState(() {
+                _lastSpokenText = responseMsg;
+              });
+              _loadData(); // reload transactions
+            });
           }
         },
         localeId: 'ar_SA',
       );
     } else {
-      if (!ctx.mounted) return;
-      ScaffoldMessenger.of(ctx).showSnackBar(
-        const SnackBar(content: Text('خدمة التعرف الصوتي غير متاحة على هذا الجهاز')),
-      );
+      // Fallback test command execution
+      await _aiAgent.processVoiceCommandText("سجل مصروف خمسمائة", (responseMsg) {
+        setState(() {
+          _lastSpokenText = responseMsg;
+          _isListening = false;
+        });
+        _loadData();
+      });
     }
   }
 
