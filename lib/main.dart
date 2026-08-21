@@ -231,6 +231,126 @@ class _HomeScreenState extends State<HomeScreen> {
     _saveData();
   }
 
+  // محاكي الأوامر الصوتية العربية واللهجة المحلية (المحاسب الصوتي الذكي)
+  void _openVoiceAssistantModal() {
+    final TextEditingController voiceInputCtrl = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.mic, color: Color(0xFF8B0000)),
+            SizedBox(width: 8),
+            Text('المحاسب الصوتي الذكي'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('تحدث أو اكتب أمرك بالعربية أو اللهجة المحلية (مثال: "سجل مبيعات بثلاثة آلاف" أو "دين علي بألفين"):', style: TextStyle(fontSize: 13, color: Colors.grey)),
+            const SizedBox(height: 12),
+            TextField(
+              controller: voiceInputCtrl,
+              decoration: const InputDecoration(
+                labelText: 'اكتب أو انطق الأمر هنا...',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.record_voice_over),
+              ),
+              maxLines: 2,
+            ),
+            const SizedBox(height: 12),
+            const Text('أوامر تجريبية سريعة:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: [
+                _chipCommand(voiceInputCtrl, 'سجل مبيعات بخمسة آلاف'),
+                _chipCommand(voiceInputCtrl, 'شراء بضاعة بألفين'),
+                _chipCommand(voiceInputCtrl, 'دين لك بثلاثة آلاف'),
+                _chipCommand(voiceInputCtrl, 'دين عليك بألف وخمسمائة'),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF8B0000), foregroundColor: Colors.white),
+            onPressed: () {
+              final text = voiceInputCtrl.text.trim();
+              Navigator.pop(context);
+              if (text.isNotEmpty) {
+                _processVoiceCommand(text);
+              }
+            },
+            child: const Text('تنفيذ الأمر'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _chipCommand(TextEditingController controller, String cmd) {
+    return ActionChip(
+      label: Text(cmd, style: const TextStyle(fontSize: 11)),
+      onPressed: () => controller.text = cmd,
+    );
+  }
+
+  void _processVoiceCommand(String rawText) {
+    String lower = rawText.toLowerCase();
+    String type = 'مبيعات';
+    if (lower.contains('مشتريات') || lower.contains('شراء')) {
+      type = 'مشتريات';
+    } else if (lower.contains('دين لك') || lower.contains('على الزبون') || lower.contains('لنا')) {
+      type = 'دين لك';
+    } else if (lower.contains('دين عليك') || lower.contains('للمورد') || lower.contains('علينا')) {
+      type = 'دين عليك';
+    } else if (lower.contains('مبيعات') || lower.contains('بيع')) {
+      type = 'مبيعات';
+    }
+
+    // استخراج رقم بسيط أو تقديري افتراضي
+    double amount = 1000.0;
+    if (lower.contains('خمسة آلاف') || lower.contains('5000')) amount = 5000.0;
+    else if (lower.contains('أربعة آلاف') || lower.contains('4000')) amount = 4000.0;
+    else if (lower.contains('ثلاثة آلاف') || lower.contains('3000')) amount = 3000.0;
+    else if (lower.contains('ألفين') || lower.contains('2000')) amount = 2000.0;
+    else if (lower.contains('ألف وخمسمائة') || lower.contains('1500')) amount = 1500.0;
+    else if (lower.contains('ألف') || lower.contains('1000')) amount = 1000.0;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('تأكيد العملية الصوتية'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('الأمر المنطوق: "$rawText"'),
+            const SizedBox(height: 10),
+            Text('نوع المعاملة: $type', style: const TextStyle(fontWeight: FontWeight.bold)),
+            Text('المبلغ المستخرج: $amount ر.ي', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green)),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF8B0000), foregroundColor: Colors.white),
+            onPressed: () {
+              Navigator.pop(context);
+              _addTransaction('أمر صوتي: $rawText', amount, type);
+            },
+            child: const Text('اعتماد الحفظ'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final List<Widget> pages = [
@@ -248,6 +368,13 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: const Color(0xFF8B0000),
         centerTitle: true,
         iconTheme: const IconThemeData(color: Colors.white),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.mic, color: Color(0xFFD4AF37)),
+            tooltip: 'الأوامر الصوتية',
+            onPressed: _openVoiceAssistantModal,
+          ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -325,7 +452,7 @@ class DashboardTab extends StatelessWidget {
                 children: [
                   const Icon(Icons.warning, color: Colors.red),
                   const SizedBox(width: 8),
-                  Text('تنبيه: يوجد $outOfStock صناف قاربت على النفاد في المخزن!', style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                  Text('تنبيه: يوجد $lowStockCount أصناف قاربت على النفاد في المخزن!', style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
                 ],
               ),
             ),
@@ -377,8 +504,6 @@ class DashboardTab extends StatelessWidget {
       ),
     );
   }
-
-  int get outOfStock => inventory.where((e) => e.quantity <= e.minLimit).length;
 
   Widget _buildCard(String title, String value, IconData icon, Color color) {
     return Container(
