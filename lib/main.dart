@@ -7,6 +7,8 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:path_provider/path_provider.dart';
 import 'package:open_file/open_file.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'package:flutter_tts/flutter_tts.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -126,11 +128,71 @@ class _HomeScreenState extends State<HomeScreen> {
   List<TransactionItem> _transactions = [];
   List<InventoryItem> _inventory = [];
   bool _isLoading = true;
+  
+  late stt.SpeechToText _speech;
+  late FlutterTts _flutterTts;
+  bool _isListening = false;
+  String _lastSpokenText = '';
 
   @override
   void initState() {
     super.initState();
+    _speech = stt.SpeechToText();
+    _flutterTts = FlutterTts();
+    _initTts();
     _loadData();
+  }
+
+  Future<void> _initTts() async {
+    await _flutterTts.setLanguage('ar-SA');
+    await _flutterTts.setSpeechRate(0.5);
+    await _flutterTts.setVolume(1.0);
+    await _flutterTts.setPitch(1.0);
+  }
+
+  Future<void> _speak(String text) async {
+    await _flutterTts.speak(text);
+  }
+
+  Future<void> _startListening(BuildContext ctx) async {
+    bool available = await _speech.initialize(
+      onStatus: (val) {
+        if (val == 'notListening' || val == 'done') {
+          setState(() => _isListening = false);
+        }
+      },
+      onError: (val) {
+        setState(() => _isListening = false);
+        ScaffoldMessenger.of(ctx).showSnackBar(
+          SnackBar(content: Text('خطأ في التعرف الصوتي: ${val.errorMsg}')),
+        );
+      },
+    );
+
+    if (available) {
+      setState(() => _isListening = true);
+      _speech.listen(
+        onResult: (val) {
+          setState(() {
+            _lastSpokenText = val.recognizedWords;
+          });
+          if (val.finalResult && _lastSpokenText.isNotEmpty) {
+            _processVoiceCommand(_lastSpokenText);
+          }
+        },
+        localeId: 'ar_SA',
+      );
+    } else {
+      if (!ctx.mounted) return;
+      ScaffoldMessenger.of(ctx).showSnackBar(
+        const SnackBar(content: Text('خدمة التعرف الصوتي غير متاحة على هذا الجهاز')),
+      );
+    }
+  }
+
+  void _stopListening() {
+    _speech.stop();
+    setState(() => _isListening = false);
   }
 
   Future<void> _loadData() async {
@@ -186,6 +248,7 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     });
     _saveData();
+    _speak('تم حفظ العملية');
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('تمت إضافة المعاملة بنجاح وحفظها محلياً')),
     );
@@ -231,64 +294,99 @@ class _HomeScreenState extends State<HomeScreen> {
     _saveData();
   }
 
-  // محاكي الأوامر الصوتية العربية واللهجة المحلية (المحاسب الصوتي الذكي)
+  // المحاسب الصوتي الذكي مع دعم الميكروفون الحقيقي والرد الصوتي
   void _openVoiceAssistantModal() {
     final TextEditingController voiceInputCtrl = TextEditingController();
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.mic, color: Color(0xFF8B0000)),
-            SizedBox(width: 8),
-            Text('المحاسب الصوتي الذكي'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('تحدث أو اكتب أمرك بالعربية أو اللهجة المحلية (مثال: "سجل مبيعات بثلاثة آلاف" أو "دين علي بألفين"):', style: TextStyle(fontSize: 13, color: Colors.grey)),
-            const SizedBox(height: 12),
-            TextField(
-              controller: voiceInputCtrl,
-              decoration: const InputDecoration(
-                labelText: 'اكتب أو انطق الأمر هنا...',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.record_voice_over),
-              ),
-              maxLines: 2,
-            ),
-            const SizedBox(height: 12),
-            const Text('أوامر تجريبية سريعة:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-            const SizedBox(height: 6),
-            Wrap(
-              spacing: 6,
-              runSpacing: 4,
-              children: [
-                _chipCommand(voiceInputCtrl, 'سجل مبيعات بخمسة آلاف'),
-                _chipCommand(voiceInputCtrl, 'شراء بضاعة بألفين'),
-                _chipCommand(voiceInputCtrl, 'دين لك بثلاثة آلاف'),
-                _chipCommand(voiceInputCtrl, 'دين عليك بألف وخمسمائة'),
-              ],
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF8B0000), foregroundColor: Colors.white),
-            onPressed: () {
-              final text = voiceInputCtrl.text.trim();
-              Navigator.pop(context);
-              if (text.isNotEmpty) {
-                _processVoiceCommand(text);
-              }
-            },
-            child: const Text('تنفيذ الأمر'),
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setStateModal) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.mic, color: Color(0xFF8B0000)),
+              SizedBox(width: 8),
+              Text('المحاسب الصوتي الذكي'),
+            ],
           ),
-        ],
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('اضغط على زر الميكروفون وتحدث بصوتك (مثال: "سجل مبيعات بخمسة آلاف") أو اكتب الأمر:', style: TextStyle(fontSize: 13, color: Colors.grey)),
+              const SizedBox(height: 12),
+              Center(
+                child: GestureDetector(
+                  onTap: () async {
+                    if (_isListening) {
+                      _stopListening();
+                      setStateModal(() {});
+                    } else {
+                      await _startListening(context);
+                      setStateModal(() {});
+                    }
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: _isListening ? Colors.red.shade100 : const Color(0xFF8B0000).withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      _isListening ? Icons.mic : Icons.mic_none,
+                      size: 40,
+                      color: const Color(0xFF8B0000),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Center(
+                child: Text(
+                  _isListening ? 'جارٍ الاستماع الآن... تحدث بوضوح' : 'اضغط للتحدث بالميكروفون',
+                  style: TextStyle(fontSize: 12, color: _isListening ? Colors.red : Colors.grey, fontWeight: FontWeight.bold),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: voiceInputCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'النص المنطوق أو المكتوب...',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.record_voice_over),
+                ),
+                maxLines: 2,
+              ),
+              const SizedBox(height: 12),
+              const Text('أوامر تجريبية سريعة:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                children: [
+                  _chipCommand(voiceInputCtrl, 'سجل مبيعات بخمسة آلاف'),
+                  _chipCommand(voiceInputCtrl, 'شراء بضاعة بألفين'),
+                  _chipCommand(voiceInputCtrl, 'دين لك بثلاثة آلاف'),
+                  _chipCommand(voiceInputCtrl, 'دين عليك بألف وخمسمائة'),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF8B0000), foregroundColor: Colors.white),
+              onPressed: () {
+                final text = voiceInputCtrl.text.trim();
+                Navigator.pop(context);
+                if (text.isNotEmpty) {
+                  _processVoiceCommand(text);
+                }
+              },
+              child: const Text('تنفيذ الأمر'),
+            ),
+          ],
+        ),
       ),
     );
   }
