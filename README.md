@@ -1,10 +1,16 @@
-# Smart Accountant — المحاسب الذكي
+# smart_accountant
 
-منصة محاسبية ومالية مستقلة واحترافية للتبادل التجاري وإدارة الحسابات، مصممة لمعايير الشركات الكبرى بنظام Offline-First ومعمارية متقدمة.
+A new Flutter project.
 
-## الميزات الرئيسية
-1. **المبيعات والمشتريات:** إدارة الفواتير والإيرادات والمصروفات اللحظية.
-2. **الديون (لك وعليك):** متابعة أرصدة العملاء والموردين وتواريخ الاستحقاق.
-3. **المخزن والمخزون:** تتبع حركة الأصناف، الوارد والمنصرف، والتنبيه التلقائي عند الحد الأدنى.
-4. **العمل بدون إنترنت (Offline-First):** تخزين محلي آمن في SQLite وطابور مزامنة (Sync Queue).
-5. **التقارير المتقدمة:** تقارير الأرباح والخسائر والتدفقات النقدية.
+## Getting Started
+
+This project is a starting point for a Flutter application.
+
+A few resources to get you started if this is your first Flutter project:
+
+- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
+- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+
+For help getting started with Flutter development, view the
+[online documentation](https://docs.flutter.dev/), which offers tutorials,
+samples, guidance on mobile development, and a full API reference.
