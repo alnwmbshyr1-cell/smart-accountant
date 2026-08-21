@@ -7,6 +7,7 @@
 - [x] PDF report generation & export
 - [x] Interactive monthly analytics charts
 - [x] User authentication and role-based access
-- [ ] Advanced Arabic & Yemeni dialect voice command parser & confirmation flow
+- [x] Advanced Arabic & Yemeni dialect voice command parser & confirmation flow
+- [x] Text-to-Speech (TTS) interactive voice responses with the owner
 - [ ] End-to-end integration tests for offline storage and voice commands
 - [ ] Final APK release build and GitHub release update
