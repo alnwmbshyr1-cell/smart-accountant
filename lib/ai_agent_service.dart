@@ -31,7 +31,7 @@ class AiAgentService {
       if (!await modelFile.exists()) {
         final dio = Dio();
         // رابط التحميل من GitHub Release الإصدار v2.0.1 (أو رابط بديل مباشر)
-        const modelUrl = 'https://github.com/alnwmbshyr1-cell/smart-accountant/releases/download/v2.0.1/gemma-2b-it-q4.bin';
+        const modelUrl = 'https://github.com/alnwmbshyr1-cell/smart-accountant/releases/download/models/gemma-2b-it-q4.bin';
         await dio.download(modelUrl, modelFile.path, onReceiveProgress: (received, total) {
           // progress tracking if needed
         });
