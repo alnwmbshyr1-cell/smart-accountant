@@ -315,12 +315,19 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // استخراج رقم بسيط أو تقديري افتراضي
     double amount = 1000.0;
-    if (lower.contains('خمسة آلاف') || lower.contains('5000')) amount = 5000.0;
-    else if (lower.contains('أربعة آلاف') || lower.contains('4000')) amount = 4000.0;
-    else if (lower.contains('ثلاثة آلاف') || lower.contains('3000')) amount = 3000.0;
-    else if (lower.contains('ألفين') || lower.contains('2000')) amount = 2000.0;
-    else if (lower.contains('ألف وخمسمائة') || lower.contains('1500')) amount = 1500.0;
-    else if (lower.contains('ألف') || lower.contains('1000')) amount = 1000.0;
+    if (lower.contains('خمسة آلاف') || lower.contains('5000')) {
+      amount = 5000.0;
+    } else if (lower.contains('أربعة آلاف') || lower.contains('4000')) {
+      amount = 4000.0;
+    } else if (lower.contains('ثلاثة آلاف') || lower.contains('3000')) {
+      amount = 3000.0;
+    } else if (lower.contains('ألفين') || lower.contains('2000')) {
+      amount = 2000.0;
+    } else if (lower.contains('ألف وخمسمائة') || lower.contains('1500')) {
+      amount = 1500.0;
+    } else if (lower.contains('ألف') || lower.contains('1000')) {
+      amount = 1000.0;
+    }
 
     showDialog(
       context: context,
@@ -958,7 +965,7 @@ class ReportsTab extends StatelessWidget {
                 pw.SizedBox(height: 20),
                 pw.Text('تاريخ التقرير: ${DateTime.now().toString().substring(0, 10)}', style: const pw.TextStyle(fontSize: 12)),
                 pw.SizedBox(height: 20),
-                pw.Table.fromTextArray(
+                pw.TableHelper.fromTextArray(
                   headers: ['الرقم', 'الوصف', 'النوع', 'المبلغ (ر.ي)', 'التاريخ'],
                   data: transactions.map((e) => [e.id, e.title, e.type, e.amount.toString(), e.date]).toList(),
                   headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
@@ -988,10 +995,12 @@ class ReportsTab extends StatelessWidget {
 
       await OpenFile.open(file.path);
 
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('تم حفظ وتصدير ملف PDF بنجاح: ${file.path}')),
       );
     } catch (e) {
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('حدث خطأ أثناء تصدير PDF: $e')),
       );
