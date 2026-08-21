@@ -19,7 +19,6 @@ dependencies:
   open_file: ^3.3.2
   speech_to_text: ^6.6.0
   flutter_tts: ^3.8.5
-  vosk_flutter: ^0.3.48
 
 dev_dependencies:
   flutter_test:

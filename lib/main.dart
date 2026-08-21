@@ -8,6 +8,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:path_provider/path_provider.dart';
 import 'package:open_file/open_file.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 
 void main() {
@@ -129,6 +130,7 @@ class _HomeScreenState extends State<HomeScreen> {
   List<InventoryItem> _inventory = [];
   bool _isLoading = true;
   
+  late stt.SpeechToText _speech;
   late FlutterTts _flutterTts;
   bool _isListening = false;
   String _lastSpokenText = '';
@@ -136,6 +138,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    _speech = stt.SpeechToText();
     _flutterTts = FlutterTts();
     _initTts();
     _loadData();
@@ -153,25 +156,43 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _startListening(BuildContext ctx) async {
-    try {
+    bool available = await _speech.initialize(
+      onStatus: (val) {
+        if (val == 'notListening' || val == 'done') {
+          setState(() => _isListening = false);
+        }
+      },
+      onError: (val) {
+        setState(() => _isListening = false);
+        ScaffoldMessenger.of(ctx).showSnackBar(
+          SnackBar(content: Text('خطأ في التعرف الصوتي: ${val.errorMsg}')),
+        );
+      },
+    );
+
+    if (available) {
       setState(() => _isListening = true);
-      // Offline local recognition stream (Vosk / Local Engine)
-      await Future.delayed(const Duration(milliseconds: 500));
-      setState(() {
-        _lastSpokenText = 'سجل مبيعات بخمسة آلاف';
-        _isListening = false;
-      });
-      _processVoiceCommand(_lastSpokenText);
-    } catch (e) {
-      setState(() => _isListening = false);
+      _speech.listen(
+        onResult: (val) {
+          setState(() {
+            _lastSpokenText = val.recognizedWords;
+          });
+          if (val.finalResult && _lastSpokenText.isNotEmpty) {
+            _processVoiceCommand(_lastSpokenText);
+          }
+        },
+        localeId: 'ar_SA',
+      );
+    } else {
       if (!ctx.mounted) return;
       ScaffoldMessenger.of(ctx).showSnackBar(
-        SnackBar(content: Text('خطأ في الاستماع المحلي دون اتصال: $e')),
+        const SnackBar(content: Text('خدمة التعرف الصوتي غير متاحة على هذا الجهاز')),
       );
     }
   }
 
   void _stopListening() {
+    _speech.stop();
     setState(() => _isListening = false);
   }
 
