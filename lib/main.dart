@@ -87,7 +87,7 @@ class SmartAccountantApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Smart Accountant - المحاسب الذكي',
+      title: 'عاقل المحاسبة الخارق v2.0.0',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(

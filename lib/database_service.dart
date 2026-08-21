@@ -45,6 +45,16 @@ class DatabaseService {
     return total;
   }
 
+  Future<List<Map<String, dynamic>>> searchTransactions(String query) async {
+    final txs = await getTransactions();
+    query = query.toLowerCase();
+    return txs.where((tx) {
+      final desc = (tx['description'] ?? '').toString().toLowerCase();
+      final type = (tx['type'] ?? '').toString().toLowerCase();
+      return desc.contains(query) || type.contains(query);
+    }).toList();
+  }
+
   Future<double> getBalance() async {
     final txs = await getTransactions();
     double balance = 0.0;

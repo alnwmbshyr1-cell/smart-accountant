@@ -13,8 +13,11 @@ class AiAgentService {
   bool get isAssistantMode => _isAssistantMode;
 
   Future<void> init() async {
-    await _tts.setLanguage("ar-SA");
-    await _tts.setSpeechRate(0.5);
+    try {
+      await _tts.setLanguage("ar-SA");
+      await _tts.setSpeechRate(0.85);
+      await _tts.setPitch(1.0); // صوت رجولي دافئ
+    } catch (_) {}
   }
 
   void startAssistant() {
@@ -27,65 +30,70 @@ class AiAgentService {
     _isListening = false;
   }
 
-  Future<void> processVoiceCommandText(String voiceText, Function(String) onResult) async {
-    await _speak("لحظة بشوف");
-    final command = _parseWithRules(voiceText);
+  Future<void> speakYemeni(String text) async {
+    await init();
+    String yemeniText = text;
+    if (!text.contains("ابشر") && !text.contains("أبشر")) {
+      yemeniText = "أبشر يا شيخ، $text";
+    }
+    await _tts.speak(yemeniText);
+  }
+
+  Future<Map<String, dynamic>> processVoiceCommandText(String voiceText, Function(String) onResult) async {
+    await init();
+    String lower = voiceText.toLowerCase();
     
-    if (command['action'] == 'add_expense') {
+    // 1. استعلام عن المصروفات اليومية أو التقارير (get_report)
+    if (lower.contains("كم صرفت") || lower.contains("المصروفات اليومية") || lower.contains("صرفت اليوم") || lower.contains("تقرير")) {
+      double total = await _db.getTodayTotal('مصروف');
+      String msg = "صرفت اليوم يا غالي مبلغ وقدره $total ريال يمني. عسى الأمور طيبة؟";
+      onResult(msg);
+      await speakYemeni(msg);
+      return {"action": "get_report", "result": total, "reply": msg};
+    }
+
+    // 2. البحث عن العمليات (search)
+    if (lower.contains("ابحث عن") || lower.contains("بحث") || lower.contains("وين")) {
+      String query = lower.replaceAll("ابحث عن", "").replaceAll("بحث", "").trim();
+      List<Map<String, dynamic>> results = await _db.searchTransactions(query);
+      String msg = "أبشر، لقيت لك ${results.length} عمليات مطابقة للبحث يا ذيبان.";
+      onResult(msg);
+      await speakYemeni(msg);
+      return {"action": "search", "query": query, "results": results, "reply": msg};
+    }
+
+    // 3. إضافة مصروف أو عملية (add_expense)
+    if (lower.contains("صرفت") || lower.contains("اشتريت") || lower.contains("دفعت") || lower.contains("سجل مصروف")) {
+      RegExp amountRegex = RegExp(r'(\d+)');
+      var amountMatch = amountRegex.firstMatch(lower);
+      double amount = amountMatch != null ? double.parse(amountMatch.group(0)!) : 5000;
+
       await _db.addTransaction(
         type: 'مصروف',
-        amount: command['amount'],
-        description: command['desc'],
+        amount: amount,
+        description: voiceText,
       );
+
       double total = await _db.getTodayTotal('مصروف');
-      String msg = "تم اضافة ${command['amount']} ريال. اجمالي مصروفات اليوم $total ريال";
+      String msg = "تم تسجيل المصروف بمبلغ $amount ريال. إجمالي مصروفات اليوم $total ريال يا شيخ.";
       onResult(msg);
-      await _speak(msg);
-      
-    } else if (command['action'] == 'add_income') {
-      await _db.addTransaction(
-        type: 'ايراد',
-        amount: command['amount'],
-        description: command['desc'],
-      );
-      String msg = "تم تسجيل ايراد ${command['amount']} ريال";
-      onResult(msg);
-      await _speak(msg);
-      
-    } else if (command['action'] == 'get_balance') {
+      await speakYemeni(msg);
+      return {"action": "add_expense", "amount": amount, "reply": msg};
+    }
+
+    // 4. الرصيد أو الإيرادات
+    if (lower.contains("كم") && lower.contains("رصيد")) {
       double balance = await _db.getBalance();
-      String msg = "رصيدك الحالي $balance ريال";
+      String msg = "رصيدك الحالي يا طويل العمر $balance ريال يمني.";
       onResult(msg);
-      await _speak(msg);
-      
-    } else {
-      String msg = "ما فهمت. ممكن تقول اضف مصروف أو كم الرصيد";
-      onResult(msg);
-      await _speak(msg);
+      await speakYemeni(msg);
+      return {"action": "get_balance", "balance": balance, "reply": msg};
     }
-  }
 
-  Map<String, dynamic> _parseWithRules(String text) {
-    text = text.toLowerCase();
-    RegExp amountRegex = RegExp(r'(\d+)');
-    var amountMatch = amountRegex.firstMatch(text);
-    int amount = amountMatch != null ? int.parse(amountMatch.group(0)!) : 0;
-    
-    if (text.contains('مصروف') || text.contains('صرفت')) {
-      return {'action': 'add_expense', 'amount': amount.toDouble(), 'desc': text};
-    }
-    if (text.contains('ايراد') || text.contains('دخل') || text.contains('مبيعات')) {
-      return {'action': 'add_income', 'amount': amount.toDouble(), 'desc': text};
-    }
-    if (text.contains('كم') && text.contains('رصيد')) {
-      return {'action': 'get_balance'};
-    }
-    return {'action': 'unknown'};
-  }
-
-  Future<void> _speak(String text) async {
-    try {
-      await _tts.speak(text);
-    } catch (_) {}
+    // رد افتراضي بالشخصية اليمنية الودودة
+    String defaultReply = "يا هلا بك يا شيخ، آمرني وش بغيت؟ أقدر أسجل مصروفك، أطلع لك تقرير اليوم، أو أبحث لك عن أي عملية.";
+    onResult(defaultReply);
+    await speakYemeni(defaultReply);
+    return {"action": "unknown", "reply": defaultReply};
   }
 }
