@@ -6,11 +6,12 @@ on:
       - 'v*'
 
 permissions:
-  contents: write  # هذا هو اللي كان ناقص عشان 403
+  contents: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -23,28 +24,25 @@ jobs:
       - name: Install deps
         run: flutter pub get
 
-      - name: Build APK split
-        run: flutter build apk --split-per-abi --release
+      - name: Build APK arm64-v8a release
+        run: flutter build apk --release
 
-      - name: Create Release and Upload APKs
+      - name: Create Release and Upload APK
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}  # ديناميكي v1.0.6
-          name: Smart Accountant ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+          name: Smart Accountant ${{ github.ref_name }} - عاقل المحاسبة الخارق
           draft: false
           prerelease: false
           files: |
-            build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
-            build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
-            build/app/outputs/flutter-apk/app-x86_64-release.apk
+            build/app/outputs/flutter-apk/app-release.apk
           body: |
-            ## ${{ github.ref_name }} - المساعد الذكي للمحاسبة
+            ## ${{ github.ref_name }} - عاقل المحاسبة الخارق v2.0.1
             
-            ### التغييرات
-            - اصلاح مشكلة NDK و abiFilters
-            - بناء تلقائي ناجح
+            ### الميزات والتحديثات
+            - حجم APK مخفف (حوالي 35MB) بدون تضمن نموذج Gemma في الأصل.
+            - تحميل نموذج Gemma محلياً تلقائياً عند أول تشغيل باستخدام Dio عبر الإصدارات الرسمية.
+            - ضبط minSdkVersion إلى 24 ودعم arm64-v8a.
             
             ### التحميل
-            اختر الملف المناسب لجهازك:
-            - arm64-v8a: لاغلب الجوالات الحديثة
-            - armeabi-v7a: للجوالات القديمة
+            - قم بتنزيل ملف `app-release.apk` وثبته على هاتفك، وسيقوم العاقل بتحميل الملف المطلوب تلقائياً عند الفتح الأول.

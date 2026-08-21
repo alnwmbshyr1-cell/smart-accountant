@@ -1,5 +1,8 @@
 import 'dart:async';
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:dio/dio.dart';
+import 'package:path_provider/path_provider.dart';
+import 'dart:io';
 import 'database_service.dart';
 
 class AiAgentService {
@@ -17,7 +20,25 @@ class AiAgentService {
       await _tts.setLanguage("ar-SA");
       await _tts.setSpeechRate(0.85);
       await _tts.setPitch(1.0); // صوت رجولي دافئ
+      await downloadGemmaModelIfNotExists();
     } catch (_) {}
+  }
+
+  Future<void> downloadGemmaModelIfNotExists() async {
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      final modelFile = File('${dir.path}/gemma-2b-it-q4.bin');
+      if (!await modelFile.exists()) {
+        final dio = Dio();
+        // رابط التحميل من GitHub Release الإصدار v2.0.1 (أو رابط بديل مباشر)
+        const modelUrl = 'https://github.com/alnwmbshyr1-cell/smart-accountant/releases/download/v2.0.1/gemma-2b-it-q4.bin';
+        await dio.download(modelUrl, modelFile.path, onReceiveProgress: (received, total) {
+          // progress tracking if needed
+        });
+      }
+    } catch (e) {
+      // Offline fallback / graceful handling
+    }
   }
 
   void startAssistant() {
