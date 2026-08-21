@@ -45,6 +45,38 @@ class TransactionItem {
       );
 }
 
+class InventoryItem {
+  final String id;
+  final String name;
+  final int quantity;
+  final double price;
+  final int minLimit;
+
+  InventoryItem({
+    required this.id,
+    required this.name,
+    required this.quantity,
+    required this.price,
+    required this.minLimit,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'quantity': quantity,
+        'price': price,
+        'minLimit': minLimit,
+      };
+
+  factory InventoryItem.fromJson(Map<String, dynamic> json) => InventoryItem(
+        id: json['id'],
+        name: json['name'],
+        quantity: json['quantity'],
+        price: (json['price'] as num).toDouble(),
+        minLimit: json['minLimit'],
+      );
+}
+
 class SmartAccountantApp extends StatelessWidget {
   const SmartAccountantApp({super.key});
 
@@ -92,41 +124,52 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
   List<TransactionItem> _transactions = [];
+  List<InventoryItem> _inventory = [];
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadTransactions();
+    _loadData();
   }
 
-  Future<void> _loadTransactions() async {
+  Future<void> _loadData() async {
     final prefs = await SharedPreferences.getInstance();
-    final String? data = prefs.getString('smart_transactions');
-    if (data != null) {
-      final List decoded = jsonDecode(data);
-      setState(() {
+    final String? txData = prefs.getString('smart_transactions');
+    final String? invData = prefs.getString('smart_inventory');
+
+    setState(() {
+      if (txData != null) {
+        final List decoded = jsonDecode(txData);
         _transactions = decoded.map((e) => TransactionItem.fromJson(e)).toList();
-        _isLoading = false;
-      });
-    } else {
-      setState(() {
+      } else {
         _transactions = [
           TransactionItem(id: '1', title: 'مبيعات بضاعة عامة', amount: 15000, type: 'مبيعات', date: '2026-08-21'),
           TransactionItem(id: '2', title: 'شراء مواد ومستلزمات', amount: 8000, type: 'مشتريات', date: '2026-08-21'),
           TransactionItem(id: '3', title: 'دين على الزبون محمد', amount: 3000, type: 'دين لك', date: '2026-08-20'),
           TransactionItem(id: '4', title: 'دين للمورد الرئيسي', amount: 5000, type: 'دين عليك', date: '2026-08-19'),
         ];
-        _isLoading = false;
-      });
-      _saveTransactions();
-    }
+      }
+
+      if (invData != null) {
+        final List decodedInv = jsonDecode(invData);
+        _inventory = decodedInv.map((e) => InventoryItem.fromJson(e)).toList();
+      } else {
+        _inventory = [
+          InventoryItem(id: '101', name: 'أرز بسمتي فاخر', quantity: 45, price: 2500, minLimit: 10),
+          InventoryItem(id: '102', name: 'لحم حنيذ بلدي', quantity: 8, price: 6000, minLimit: 5),
+          InventoryItem(id: '103', name: 'بهارات يمنية خاصة', quantity: 120, price: 500, minLimit: 20),
+        ];
+      }
+      _isLoading = false;
+    });
+    _saveData();
   }
 
-  Future<void> _saveTransactions() async {
+  Future<void> _saveData() async {
     final prefs = await SharedPreferences.getInstance();
-    final encoded = jsonEncode(_transactions.map((e) => e.toJson()).toList());
-    await prefs.setString('smart_transactions', encoded);
+    await prefs.setString('smart_transactions', jsonEncode(_transactions.map((e) => e.toJson()).toList()));
+    await prefs.setString('smart_inventory', jsonEncode(_inventory.map((e) => e.toJson()).toList()));
   }
 
   void _addTransaction(String title, double amount, String type) {
@@ -142,7 +185,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       );
     });
-    _saveTransactions();
+    _saveData();
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('تمت إضافة المعاملة بنجاح وحفظها محلياً')),
     );
@@ -152,14 +195,49 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _transactions.removeWhere((element) => element.id == id);
     });
-    _saveTransactions();
+    _saveData();
+  }
+
+  void _addInventoryItem(String name, int qty, double price, int limit) {
+    setState(() {
+      _inventory.add(InventoryItem(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        name: name,
+        quantity: qty,
+        price: price,
+        minLimit: limit,
+      ));
+    });
+    _saveData();
+  }
+
+  void _updateInventoryQty(String id, int delta) {
+    setState(() {
+      final index = _inventory.indexWhere((element) => element.id == id);
+      if (index != -1) {
+        final item = _inventory[index];
+        final newQty = item.quantity + delta;
+        if (newQty >= 0) {
+          _inventory[index] = InventoryItem(
+            id: item.id,
+            name: item.name,
+            quantity: newQty,
+            price: item.price,
+            minLimit: item.minLimit,
+          );
+        }
+      }
+    });
+    _saveData();
   }
 
   @override
   Widget build(BuildContext context) {
     final List<Widget> pages = [
-      DashboardTab(transactions: _transactions, onAdd: _addTransaction),
+      DashboardTab(transactions: _transactions, inventory: _inventory, onAdd: _addTransaction),
+      InventoryTab(inventory: _inventory, onAdd: _addInventoryItem, onUpdateQty: _updateInventoryQty),
       CalculatorTab(onAddTransaction: _addTransaction),
+      ChartsTab(transactions: _transactions),
       HistoryTab(transactions: _transactions, onDelete: _deleteTransaction),
       ReportsTab(transactions: _transactions),
     ];
@@ -182,21 +260,24 @@ class _HomeScreenState extends State<HomeScreen> {
         type: BottomNavigationBarType.fixed,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'الرئيسية'),
-          BottomNavigationBarItem(icon: Icon(Icons.calculate), label: 'الحاسبة الذكية'),
-          BottomNavigationBarItem(icon: Icon(Icons.receipt_long), label: 'سجل العمليات'),
-          BottomNavigationBarItem(icon: Icon(Icons.picture_as_pdf), label: 'التقارير و PDF'),
+          BottomNavigationBarItem(icon: Icon(Icons.inventory), label: 'المخزن'),
+          BottomNavigationBarItem(icon: Icon(Icons.calculate), label: 'الحاسبة'),
+          BottomNavigationBarItem(icon: Icon(Icons.bar_chart), label: 'الرسوم'),
+          BottomNavigationBarItem(icon: Icon(Icons.receipt_long), label: 'السجل'),
+          BottomNavigationBarItem(icon: Icon(Icons.picture_as_pdf), label: 'التقارير'),
         ],
       ),
     );
   }
 }
 
-// 1. لوحة التحكم الرئيسية (Dashboard)
+// 1. لوحة التحكم الرئيسية
 class DashboardTab extends StatelessWidget {
   final List<TransactionItem> transactions;
+  final List<InventoryItem> inventory;
   final Function(String, double, String) onAdd;
 
-  const DashboardTab({super.key, required this.transactions, required this.onAdd});
+  const DashboardTab({super.key, required this.transactions, required this.inventory, required this.onAdd});
 
   @override
   Widget build(BuildContext context) {
@@ -204,6 +285,7 @@ class DashboardTab extends StatelessWidget {
     double totalPurchases = transactions.where((e) => e.type == 'مشتريات').fold(0, (sum, item) => sum + item.amount);
     double totalReceivable = transactions.where((e) => e.type == 'دين لك').fold(0, (sum, item) => sum + item.amount);
     double totalPayable = transactions.where((e) => e.type == 'دين عليك').fold(0, (sum, item) => sum + item.amount);
+    int lowStockCount = inventory.where((e) => e.quantity <= e.minLimit).length;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
@@ -234,6 +316,20 @@ class DashboardTab extends StatelessWidget {
               ],
             ),
           ),
+          if (lowStockCount > 0) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.red.shade200)),
+              child: Row(
+                children: [
+                  const Icon(Icons.warning, color: Colors.red),
+                  const SizedBox(width: 8),
+                  Text('تنبيه: يوجد $outOfStock صناف قاربت على النفاد في المخزن!', style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 20),
           const Text('ملخص الحسابات المالية', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 12),
@@ -281,6 +377,8 @@ class DashboardTab extends StatelessWidget {
       ),
     );
   }
+
+  int get outOfStock => inventory.where((e) => e.quantity <= e.minLimit).length;
 
   Widget _buildCard(String title, String value, IconData icon, Color color) {
     return Container(
@@ -330,7 +428,109 @@ class DashboardTab extends StatelessWidget {
   }
 }
 
-// 2. الحاسبة الذكية (Calculator Tab)
+// 2. إدارة المخزن (Inventory Tab)
+class InventoryTab extends StatelessWidget {
+  final List<InventoryItem> inventory;
+  final Function(String, int, double, int) onAdd;
+  final Function(String, int) onUpdateQty;
+
+  const InventoryTab({super.key, required this.inventory, required this.onAdd, required this.onUpdateQty});
+
+  void _showAddItemDialog(BuildContext context) {
+    final nameCtrl = TextEditingController();
+    final qtyCtrl = TextEditingController();
+    final priceCtrl = TextEditingController();
+    final limitCtrl = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('إضافة صنف جديد للمخزن'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'اسم الصنف')),
+              TextField(controller: qtyCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'الكمية الأولية')),
+              TextField(controller: priceCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'سعر الوحدة (ر.ي)')),
+              TextField(controller: limitCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'حد التنبيه الأدنى')),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')),
+          ElevatedButton(
+            onPressed: () {
+              if (nameCtrl.text.isNotEmpty && qtyCtrl.text.isNotEmpty && priceCtrl.text.isNotEmpty) {
+                onAdd(
+                  nameCtrl.text.trim(),
+                  int.tryParse(qtyCtrl.text) ?? 0,
+                  double.tryParse(priceCtrl.text) ?? 0,
+                  int.tryParse(limitCtrl.text) ?? 5,
+                );
+                Navigator.pop(context);
+              }
+            },
+            child: const Text('حفظ'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: inventory.isEmpty
+          ? const Center(child: Text('المخزن فارغ. أضف أصناف جديدة.'))
+          : ListView.builder(
+              padding: const EdgeInsets.all(12),
+              itemCount: inventory.length,
+              itemBuilder: (context, index) {
+                final item = inventory[index];
+                bool isLow = item.quantity <= item.minLimit;
+                return Card(
+                  elevation: 2,
+                  margin: const EdgeInsets.symmetric(vertical: 6),
+                  child: ListTile(
+                    title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: Text('السعر: ${item.price} ر.ي • الحد الأدنى: ${item.minLimit}'),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text('${item.quantity} وحدة', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: isLow ? Colors.red : Colors.green)),
+                            if (isLow) const Text('منخفض!', style: TextStyle(fontSize: 10, color: Colors.red)),
+                          ],
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          icon: const Icon(Icons.remove_circle, color: Colors.orange),
+                          onPressed: () => onUpdateQty(item.id, -1),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.add_circle, color: Colors.green),
+                          onPressed: () => onUpdateQty(item.id, 1),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _showAddItemDialog(context),
+        backgroundColor: const Color(0xFF8B0000),
+        child: const Icon(Icons.add, color: Colors.white),
+      ),
+    );
+  }
+}
+
+// 3. الحاسبة الذكية (Calculator Tab)
 class CalculatorTab extends StatefulWidget {
   final Function(String, double, String) onAddTransaction;
 
@@ -485,7 +685,85 @@ class _CalculatorTabState extends State<CalculatorTab> {
   }
 }
 
-// 3. سجل العمليات (History Tab)
+// 4. الرسوم البيانية التفاعلية (Charts Tab)
+class ChartsTab extends StatelessWidget {
+  final List<TransactionItem> transactions;
+
+  const ChartsTab({super.key, required this.transactions});
+
+  @override
+  Widget build(BuildContext context) {
+    double totalSales = transactions.where((e) => e.type == 'مبيعات').fold(0, (sum, i) => sum + i.amount);
+    double totalPurchases = transactions.where((e) => e.type == 'مشتريات').fold(0, (sum, i) => sum + i.amount);
+    double totalReceivable = transactions.where((e) => e.type == 'دين لك').fold(0, (sum, i) => sum + i.amount);
+    double totalPayable = transactions.where((e) => e.type == 'دين عليك').fold(0, (sum, i) => sum + i.amount);
+
+    double maxVal = [totalSales, totalPurchases, totalReceivable, totalPayable].reduce((a, b) => a > b ? a : b);
+    if (maxVal == 0) maxVal = 1;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('التحليل المالي والرسوم البيانية الشهرية', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 6),
+          const Text('مقارنة بصرية شاملة لأداء المبيعات والمشتريات والديون.', style: TextStyle(color: Colors.grey)),
+          const SizedBox(height: 24),
+          _buildBarItem('المبيعات', totalSales, Colors.green, maxVal),
+          _buildBarItem('المشتريات', totalPurchases, Colors.orange, maxVal),
+          _buildBarItem('ديون لك', totalReceivable, Colors.blue, maxVal),
+          _buildBarItem('ديون عليك', totalPayable, Colors.red, maxVal),
+          const SizedBox(height: 30),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(12)),
+            child: const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('تحليلات ذكية:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                SizedBox(height: 8),
+                Text('• حركة المبيعات مستقرة وتغطي تكاليف المشتريات بنجاح.'),
+                Text('• يوصى بمتابعة تحصيل الديون المستحقة (دين لك) لتحسين السيولة النقدية.'),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBarItem(String label, double value, Color color, double max) {
+    double pct = (value / max).clamp(0.0, 1.0);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
+              Text('$value ر.ي', style: TextStyle(fontWeight: FontWeight.bold, color: color)),
+            ],
+          ),
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: LinearProgressIndicator(
+              value: pct,
+              color: color,
+              backgroundColor: Colors.grey.shade200,
+              minHeight: 16,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// 5. سجل العمليات (History Tab)
 class HistoryTab extends StatelessWidget {
   final List<TransactionItem> transactions;
   final Function(String) onDelete;
@@ -524,7 +802,7 @@ class HistoryTab extends StatelessWidget {
   }
 }
 
-// 4. التقارير وتصدير PDF (Reports Tab)
+// 6. التقارير وتصدير PDF (Reports Tab)
 class ReportsTab extends StatelessWidget {
   final List<TransactionItem> transactions;
 
