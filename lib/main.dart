@@ -565,9 +565,9 @@ class _MainDashboardScreenState extends ConsumerState<MainDashboardScreen> {
         elevation: 4,
         actions: [
           IconButton(
-            icon: const Icon(Icons.settings_voice, color: Colors.amber),
+            icon: const Icon(Icons.settings, color: Colors.amber),
             onPressed: _showVoiceSettings,
-            tooltip: 'إعدادات التنشيط الصوتي',
+            tooltip: 'الإعدادات',
           ),
           IconButton(
             icon: _isLoading

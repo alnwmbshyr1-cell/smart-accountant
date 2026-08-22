@@ -23,5 +23,6 @@ void main() {
 
     // Verify that the dashboard scaffold is mounted in the widget tree.
     expect(find.byType(MainDashboardScreen), findsOneWidget);
+    expect(find.byTooltip('الإعدادات'), findsOneWidget);
   });
 }

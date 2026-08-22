@@ -9,6 +9,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   sqfliteFfiInit();
   databaseFactory = databaseFactoryFfi;
+  final aiAgent = AiAgentService();
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
@@ -23,8 +24,6 @@ void main() {
   });
 
   group('v3.1.0 Indexed SQLite & Yemeni Dialect Tests', () {
-    final aiAgent = AiAgentService();
-
     test('Verify Yemeni Dictionary normalization for local slang terms', () {
       expect(YemeniDictionary.normalizeYemeniText('بعت بضاعة'), 'مبيعات بضاعة');
       expect(
@@ -61,5 +60,29 @@ void main() {
       expect(result['targetTab'], 1);
       expect(lastReply.contains('مبيعات'), true);
     });
+  });
+
+  test('Parse debt receivable, debt payable, purchase, and inventory commands',
+      () {
+    final debtReceivable =
+        aiAgent.parseCommandToJson('دين لي على خالد بمئة ألف');
+    expect(debtReceivable['النوع'], 'دين_لي');
+    expect(debtReceivable['المبلغ'], 100000.0);
+
+    final debtPayable = aiAgent.parseCommandToJson('علي دين للمورد بعشرة آلاف');
+    expect(debtPayable['النوع'], 'دين_علي');
+    expect(debtPayable['المبلغ'], 10000.0);
+
+    final purchase = aiAgent.parseCommandToJson('اشتريت بضاعة بخمسين ألف');
+    expect(purchase['النوع'], 'مشتريات');
+    expect(purchase['المبلغ'], 50000.0);
+
+    final inventory = aiAgent.parseCommandToJson('أضف عشرة أصناف للمخزن');
+    expect(inventory['النوع'], 'مخزون');
+  });
+
+  test('Reject command without a positive amount', () {
+    final result = aiAgent.parseCommandToJson('سجل مصروف بنزين');
+    expect(result['المبلغ'], 0.0);
   });
 }
