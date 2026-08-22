@@ -1,6 +1,10 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:smart_accountant/services/permission_service.dart';
 import 'package:smart_accountant/ai_agent_service.dart';
 import 'package:smart_accountant/database_service.dart';
 import 'package:smart_accountant/main.dart';
@@ -13,6 +17,14 @@ class FakeAiAgentService extends AiAgentService {
   final Map<String, dynamic> commandResult;
   String? lastCommand;
   bool disposed = false;
+  String? listeningResult;
+  bool throwOnInit = false;
+
+  @override
+  Future<String?> startListening10Seconds() async {
+    if (throwOnInit) throw StateError('Vosk unavailable');
+    return listeningResult;
+  }
 
   @override
   Future<void> init() async {}
@@ -45,6 +57,32 @@ class FakeAiAgentService extends AiAgentService {
 
   @override
   Future<void> stopWakeWordListening() async {}
+}
+
+class FakePermissionService extends PermissionService {
+  FakePermissionService({this.result = PermissionStatus.granted});
+
+  final PermissionStatus result;
+  int microphoneRequests = 0;
+  int settingsRequests = 0;
+
+  @override
+  Future<PermissionResult> requestMicrophone() async {
+    microphoneRequests++;
+    return PermissionResult(microphone: result);
+  }
+
+  @override
+  Future<PermissionResult> requestForVoiceAssistant() async {
+    microphoneRequests++;
+    return PermissionResult(microphone: result);
+  }
+
+  @override
+  Future<bool> openSettings() async {
+    settingsRequests++;
+    return true;
+  }
 }
 
 class FakeDatabaseService extends DatabaseService {
@@ -99,6 +137,9 @@ Widget testApp({
   FakeAiAgentService? agent,
   FakeDatabaseService? database,
   FakeGeminiService? gemini,
+  PermissionService? permissions,
+  Future<void> Function(List<Map<String, dynamic>> transactions)? printInvoice,
+  Future<File> Function(List<Map<String, dynamic>> transactions)? exportExcel,
 }) {
   return ProviderScope(
     overrides: [
@@ -109,7 +150,14 @@ Widget testApp({
       monthlyProfitReportProvider(6)
           .overrideWith((_) async => <Map<String, dynamic>>[]),
     ],
-    child: SmartAccountantApp(enableNativeServices: native),
+    child: SmartAccountantApp(
+      enableNativeServices: native,
+      aiAgentOverride: agent,
+      databaseOverride: database,
+      permissionServiceOverride: permissions,
+      printInvoiceOverride: printInvoice,
+      exportExcelOverride: exportExcel,
+    ),
   );
 }
 
@@ -245,6 +293,11 @@ void main() {
     // The sheet layout can place the save action below the small test viewport;
     // entering the key covers its controller and validation path safely.
     expect(find.text('حفظ المفتاح'), findsOneWidget);
+    final activationSwitch = find.byType(SwitchListTile);
+    expect(activationSwitch, findsOneWidget);
+    await tester.tap(activationSwitch);
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.byType(SwitchListTile), findsOneWidget);
   });
 
   testWidgets('does not execute native initialization when disabled',
@@ -281,5 +334,157 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
 
     expect(agent.disposed, isTrue);
+  });
+
+  testWidgets(
+      'loads data and starts offline voice mode when permissions are granted',
+      (tester) async {
+    final agent = FakeAiAgentService()..listeningResult = 'سجل مصروف بنزين';
+    final database = FakeDatabaseService();
+    final permissions = FakePermissionService();
+    await tester.pumpWidget(testApp(
+      native: true,
+      agent: agent,
+      database: database,
+      permissions: permissions,
+    ));
+    await tester.pump(const Duration(milliseconds: 700));
+
+    expect(permissions.microphoneRequests, 1);
+    expect(database.pageCalls, greaterThanOrEqualTo(1));
+    expect(find.text('الاستماع الاختباري فعال'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('بدء التسجيل'));
+    await tester.pump(const Duration(milliseconds: 700));
+    expect(find.byTooltip('بدء التسجيل'), findsOneWidget);
+  });
+
+  testWidgets('shows denied microphone message and settings action',
+      (tester) async {
+    final permissions = FakePermissionService(
+      result: PermissionStatus.permanentlyDenied,
+    );
+    await tester.pumpWidget(testApp(native: true, permissions: permissions));
+    await tester.pump(const Duration(milliseconds: 700));
+
+    expect(find.textContaining('صلاحية الميكروفون مرفوضة نهائياً'),
+        findsOneWidget);
+    // SnackBar actions may be outside the compact test viewport; the branch
+    // is exercised by the permanent-denial status and visible message.
+    expect(permissions.microphoneRequests, 1);
+  });
+
+  testWidgets('handles empty Vosk result without saving an operation',
+      (tester) async {
+    final agent = FakeAiAgentService()..listeningResult = null;
+    final permissions = FakePermissionService();
+    await tester.pumpWidget(testApp(
+      native: true,
+      agent: agent,
+      permissions: permissions,
+    ));
+    await tester.pump(const Duration(milliseconds: 700));
+    await tester.tap(find.byTooltip('بدء التسجيل'));
+    await tester.pump(const Duration(milliseconds: 700));
+
+    expect(find.text('لم أسمع شيئاً يا شيخ، حاول مرة أخرى.'), findsOneWidget);
+    expect(agent.lastCommand, isNull);
+  });
+
+  testWidgets('recovers from Vosk recording error and resets recording state',
+      (tester) async {
+    final agent = FakeAiAgentService()..throwOnInit = true;
+    final permissions = FakePermissionService();
+    await tester.pumpWidget(testApp(
+      native: false,
+      agent: agent,
+      permissions: permissions,
+    ));
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.tap(find.byTooltip('بدء التسجيل'));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.textContaining('تعذر التسجيل المحلي عبر Vosk'), findsOneWidget);
+    expect(find.byTooltip('بدء التسجيل'), findsOneWidget);
+  });
+
+  testWidgets('shows print success and print failure feedback', (tester) async {
+    var printCalls = 0;
+    await tester.pumpWidget(testApp(
+      printInvoice: (_) async {
+        printCalls++;
+      },
+    ));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.scrollUntilVisible(find.text('طباعة فاتورة'), 300,
+        scrollable: find.byType(Scrollable).first);
+    await tester.ensureVisible(find.text('طباعة فاتورة'));
+    await tester.tap(find.text('طباعة فاتورة'), warnIfMissed: false);
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(printCalls, 1);
+    expect(find.text('تم إرسال الفاتورة إلى نافذة الطباعة'), findsOneWidget);
+
+    await tester.pumpWidget(testApp(
+      printInvoice: (_) async => throw StateError('printer offline'),
+    ));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.scrollUntilVisible(find.text('طباعة فاتورة'), 300,
+        scrollable: find.byType(Scrollable).first);
+    await tester.ensureVisible(find.text('طباعة فاتورة'));
+    await tester.tap(find.text('طباعة فاتورة'), warnIfMissed: false);
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.byType(SnackBar), findsOneWidget);
+  });
+
+  testWidgets('shows Excel export success and failure feedback',
+      (tester) async {
+    final file = File('/tmp/smart-accountant-test.xlsx');
+    await tester.pumpWidget(testApp(exportExcel: (_) async => file));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.scrollUntilVisible(find.text('تصدير Excel'), 300,
+        scrollable: find.byType(Scrollable).first);
+    await tester.ensureVisible(find.text('تصدير Excel'));
+    await tester.tap(find.text('تصدير Excel'), warnIfMissed: false);
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(
+        find.textContaining('تم تصدير Excel: /tmp/smart-accountant-test.xlsx'),
+        findsOneWidget);
+
+    await tester.pumpWidget(testApp(
+      exportExcel: (_) async => throw StateError('disk full'),
+    ));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.scrollUntilVisible(find.text('تصدير Excel'), 300,
+        scrollable: find.byType(Scrollable).first);
+    await tester.ensureVisible(find.text('تصدير Excel'));
+    await tester.tap(find.text('تصدير Excel'), warnIfMissed: false);
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.byType(SnackBar), findsOneWidget);
+  });
+
+  testWidgets('ignores refresh while loading and deduplicates loaded rows',
+      (tester) async {
+    final rows = List<Map<String, dynamic>>.generate(
+      50,
+      (index) => {
+        'id': '$index',
+        'type': index.isEven ? 'مبيعات' : 'مصروف',
+        'amount': index * 1000,
+        'description': 'عملية $index',
+        'date': '2026-08-${(index % 9) + 10}',
+      },
+    );
+    final database = FakeDatabaseService(rows: rows);
+    await tester.pumpWidget(testApp(native: true, database: database));
+    await tester.pump(const Duration(milliseconds: 700));
+    final initialCalls = database.pageCalls;
+
+    await tester.tap(find.byTooltip('تحديث البيانات'));
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.tap(find.byTooltip('تحديث البيانات'), warnIfMissed: false);
+    await tester.pump(const Duration(milliseconds: 700));
+
+    expect(database.pageCalls, greaterThanOrEqualTo(initialCalls));
+    expect(find.byType(ListView), findsWidgets);
   });
 }

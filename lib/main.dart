@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -24,9 +25,21 @@ class SmartAccountantApp extends StatelessWidget {
   const SmartAccountantApp({
     super.key,
     this.enableNativeServices = true,
+    this.aiAgentOverride,
+    this.databaseOverride,
+    this.permissionServiceOverride,
+    this.printInvoiceOverride,
+    this.exportExcelOverride,
   });
 
   final bool enableNativeServices;
+  final AiAgentService? aiAgentOverride;
+  final DatabaseService? databaseOverride;
+  final PermissionService? permissionServiceOverride;
+  final Future<void> Function(List<Map<String, dynamic>> transactions)?
+      printInvoiceOverride;
+  final Future<File> Function(List<Map<String, dynamic>> transactions)?
+      exportExcelOverride;
 
   @override
   Widget build(BuildContext context) {
@@ -93,7 +106,14 @@ class SmartAccountantApp extends StatelessWidget {
           ],
         );
       },
-      home: MainDashboardScreen(enableNativeServices: enableNativeServices),
+      home: MainDashboardScreen(
+        enableNativeServices: enableNativeServices,
+        aiAgentOverride: aiAgentOverride,
+        databaseOverride: databaseOverride,
+        permissionServiceOverride: permissionServiceOverride,
+        printInvoiceOverride: printInvoiceOverride,
+        exportExcelOverride: exportExcelOverride,
+      ),
     );
   }
 }
@@ -102,9 +122,21 @@ class MainDashboardScreen extends ConsumerStatefulWidget {
   const MainDashboardScreen({
     super.key,
     this.enableNativeServices = true,
+    this.aiAgentOverride,
+    this.databaseOverride,
+    this.permissionServiceOverride,
+    this.printInvoiceOverride,
+    this.exportExcelOverride,
   });
 
   final bool enableNativeServices;
+  final AiAgentService? aiAgentOverride;
+  final DatabaseService? databaseOverride;
+  final PermissionService? permissionServiceOverride;
+  final Future<void> Function(List<Map<String, dynamic>> transactions)?
+      printInvoiceOverride;
+  final Future<File> Function(List<Map<String, dynamic>> transactions)?
+      exportExcelOverride;
 
   @override
   ConsumerState<MainDashboardScreen> createState() =>
@@ -115,7 +147,7 @@ class _MainDashboardScreenState extends ConsumerState<MainDashboardScreen> {
   int _currentIndex = 0;
   late final AiAgentService _aiAgent;
   late final DatabaseService _db;
-  final PermissionService _permissions = const PermissionService();
+  late final PermissionService _permissions;
 
   bool _isListening = false;
   bool _isRecording = false;
@@ -142,8 +174,10 @@ class _MainDashboardScreenState extends ConsumerState<MainDashboardScreen> {
   @override
   void initState() {
     super.initState();
-    _aiAgent = ref.read(aiAgentServiceProvider);
-    _db = ref.read(databaseServiceProvider);
+    _aiAgent = widget.aiAgentOverride ?? ref.read(aiAgentServiceProvider);
+    _db = widget.databaseOverride ?? ref.read(databaseServiceProvider);
+    _permissions =
+        widget.permissionServiceOverride ?? const PermissionService();
     _transactionsController.addListener(_onTransactionsScroll);
     if (widget.enableNativeServices) {
       _prepareVoiceFeatures();
@@ -429,7 +463,9 @@ class _MainDashboardScreenState extends ConsumerState<MainDashboardScreen> {
     if (_isLoading) return;
     setState(() => _isLoading = true);
     try {
-      await ExportService.printInvoice(_transactions);
+      await (widget.printInvoiceOverride ?? ExportService.printInvoice)(
+        _transactions,
+      );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('تم إرسال الفاتورة إلى نافذة الطباعة')),
@@ -448,7 +484,10 @@ class _MainDashboardScreenState extends ConsumerState<MainDashboardScreen> {
     if (_isLoading) return;
     setState(() => _isLoading = true);
     try {
-      final file = await ExportService.exportToExcel(_transactions);
+      final file =
+          await (widget.exportExcelOverride ?? ExportService.exportToExcel)(
+        _transactions,
+      );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('تم تصدير Excel: ${file.path}')),
@@ -513,14 +552,23 @@ class _MainDashboardScreenState extends ConsumerState<MainDashboardScreen> {
       _lastWords = '';
       _assistantStatus = 'جاري الاستماع محلياً لمدة 10 ثوانٍ... تكلم الآن';
     });
-    final text = await _aiAgent.startListening10Seconds();
-    if (!mounted) return;
-    setState(() {
-      _lastWords = text ?? '';
-      _isListening = false;
-      _isRecording = false;
-    });
-    await _processRecognizedCommand();
+    try {
+      final text = await _aiAgent.startListening10Seconds();
+      if (!mounted) return;
+      setState(() {
+        _lastWords = text ?? '';
+        _isListening = false;
+        _isRecording = false;
+      });
+      await _processRecognizedCommand();
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _isListening = false;
+        _isRecording = false;
+        _assistantStatus = 'تعذر التسجيل المحلي عبر Vosk: $error';
+      });
+    }
   }
 
   Future<void> _stopListeningAndProcess() async {
