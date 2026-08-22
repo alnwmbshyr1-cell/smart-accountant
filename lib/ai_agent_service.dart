@@ -18,7 +18,7 @@ class AiAgentService {
     try {
       await _tts.setLanguage("ar-SA");
       await _tts.setSpeechRate(0.82);
-      await _tts.setPitch(0.8); // صوت رجل فخم وعميق
+      await _tts.setPitch(0.8);
       await downloadGemmaModelIfNotExists();
     } catch (_) {}
   }
@@ -46,25 +46,26 @@ class AiAgentService {
   }
 
   Future<void> speakYemeni(String text) async {
-    await init();
-    String yemeniText = text;
-    if (!text.contains("ابشر") && !text.contains("أبشر") && !text.contains("تم يا شيخ")) {
-      yemeniText = "أبشر يا شيخ، $text";
-    }
-    await _tts.speak(yemeniText);
+    try {
+      await init();
+      String yemeniText = text;
+      if (!text.contains("ابشر") && !text.contains("أبشر") && !text.contains("تم يا شيخ")) {
+        yemeniText = "أبشر يا شيخ، $text";
+      }
+      await _tts.speak(yemeniText);
+    } catch (_) {}
   }
 
-  // محلل الأوامر العربية وتحويل الكلمات العددية إلى أرقام حقيقية صحيحة
   double parseArabicNumber(String text) {
     String clean = text.toLowerCase();
     
     if (clean.contains("مليار")) return 1000000000;
     if (clean.contains("مليون")) return 1000000;
-    if (clean.contains("مئة الف") || clean.contains("مائة الف")) return 100000;
-    if (clean.contains("عشرين الف") || clean.contains("عشرون الف")) return 20000;
-    if (clean.contains("خمسين الف")) return 50000;
-    if (clean.contains("الفين")) return 2000;
-    if (clean.contains("الف")) return 1000;
+    if (clean.contains("مئة الف") || clean.contains("مائة الف") || clean.contains("مئة ألف")) return 100000;
+    if (clean.contains("عشرين الف") || clean.contains("عشرون الف") || clean.contains("عشرين ألف")) return 20000;
+    if (clean.contains("خمسين الف") || clean.contains("خمسين ألف")) return 50000;
+    if (clean.contains("الفين") || clean.contains("ألفين")) return 2000;
+    if (clean.contains("الف") || clean.contains("ألف")) return 1000;
 
     RegExp regex = RegExp(r'(\d[\d,\.]*)');
     var match = regex.firstMatch(clean);
@@ -79,7 +80,6 @@ class AiAgentService {
     await init();
     String lower = voiceText.toLowerCase();
     
-    // 1. استعلام عن التقارير (get_report)
     if (lower.contains("كم صرفت") || lower.contains("تقرير اليوم") || lower.contains("المصروفات اليومية") || lower.contains("صرفت اليوم")) {
       double total = await _db.getTodayTotal('مصروف');
       String msg = "تم يا شيخ. صرفت اليوم مبلغ وقدره ${total.toStringAsFixed(0)} ريال يمني.";
@@ -88,7 +88,6 @@ class AiAgentService {
       return {"action": "get_report", "result": total, "reply": msg, "targetTab": 0};
     }
 
-    // 2. البحث (search)
     if (lower.contains("ابحث عن") || lower.contains("بحث") || lower.contains("وين")) {
       String query = lower.replaceAll("ابحث عن", "").replaceAll("بحث", "").trim();
       List<Map<String, dynamic>> results = await _db.searchTransactions(query);
@@ -98,16 +97,14 @@ class AiAgentService {
       return {"action": "search", "query": query, "results": results, "reply": msg, "targetTab": 0};
     }
 
-    // 3. مبيعات (Sales) - مثال: "امس بعت لاحمد بضاعة بمليون ريال اجل" أو "مبيعات بمليون ريال"
     if (lower.contains("بعت") || lower.contains("مبيعات") || lower.contains("بيع")) {
       double amount = parseArabicNumber(lower);
-      if (amount <= 0) amount = 1000000; // الافتراضي للمليون إذا لم يضبط الرقم
+      if (amount <= 0) amount = 1000000;
       
-      String desc = voiceText;
       await _db.addTransaction(
         type: 'مبيعات',
         amount: amount,
-        description: desc,
+        description: voiceText,
       );
 
       String msg = "تم يا شيخ. سجلت مبيعات بمبلغ ${amount.toStringAsFixed(0)} ريال.";
@@ -116,7 +113,6 @@ class AiAgentService {
       return {"action": "add_sale", "amount": amount, "reply": msg, "targetTab": 0};
     }
 
-    // 4. مشتريات (Purchases)
     if (lower.contains("اشتريت") || lower.contains("مشتريات") || lower.contains("شريت")) {
       double amount = parseArabicNumber(lower);
       if (amount <= 0) amount = 50000;
@@ -133,8 +129,7 @@ class AiAgentService {
       return {"action": "add_purchase", "amount": amount, "reply": msg, "targetTab": 1};
     }
 
-    // 5. دين لي (Debt To Me / Receivable) - مثل: "دين لي على خالد بمئة الف"
-    if (lower.contains("دين لي") || lower.contains("على") && (lower.contains("دين") || lower.contains("سلف"))) {
+    if (lower.contains("دين لي") || (lower.contains("على") && (lower.contains("دين") || lower.contains("سلف")))) {
       double amount = parseArabicNumber(lower);
       if (amount <= 0) amount = 100000;
 
@@ -150,8 +145,7 @@ class AiAgentService {
       return {"action": "debt_to_me", "amount": amount, "reply": msg, "targetTab": 2};
     }
 
-    // 6. دين علي (Debt From Me / Payable)
-    if (lower.contains("دين علي") || lower.contains("ديني") || lower.contains("لي دين")) {
+    if (lower.contains("دين علي") || lower.contains("ديني") || lower.contains("لي دين") || lower.startsWith("علي دين")) {
       double amount = parseArabicNumber(lower);
       if (amount <= 0) amount = 50000;
 
@@ -167,7 +161,6 @@ class AiAgentService {
       return {"action": "debt_from_me", "amount": amount, "reply": msg, "targetTab": 2};
     }
 
-    // 7. مصروفات (Expenses) - مثل: "سجل مصروف بنزين بعشرين الف"
     if (lower.contains("صرفت") || lower.contains("مصروف") || lower.contains("دفعت") || lower.contains("بنزين")) {
       double amount = parseArabicNumber(lower);
       if (amount <= 0) amount = 20000;
@@ -184,7 +177,6 @@ class AiAgentService {
       return {"action": "add_expense", "amount": amount, "reply": msg, "targetTab": 0};
     }
 
-    // 8. مخزن (Inventory)
     if (lower.contains("مخزن") || lower.contains("بضاعة") || lower.contains("مستودع")) {
       String msg = "أبشر يا شيخ، تم فتح قسم المخزون وعرض العناصر المتوفرة.";
       onResult(msg);
@@ -192,7 +184,6 @@ class AiAgentService {
       return {"action": "inventory", "reply": msg, "targetTab": 3};
     }
 
-    // رد افتراضي ذكي
     String defaultReply = "يا هلا بك يا شيخ، أمرك على عيني وراسي. أقدر أسجل مبيعات، مشتريات، ديون، ومصروفات فوراً.";
     onResult(defaultReply);
     await speakYemeni(defaultReply);
