@@ -18,13 +18,19 @@ void main() {
     } catch (_) {}
   });
 
+  tearDown(() async {
+    await DatabaseService().closeForTesting();
+  });
+
   group('v3.1.0 Indexed SQLite & Yemeni Dialect Tests', () {
     final aiAgent = AiAgentService();
 
     test('Verify Yemeni Dictionary normalization for local slang terms', () {
       expect(YemeniDictionary.normalizeYemeniText('بعت بضاعة'), 'مبيعات بضاعة');
-      expect(YemeniDictionary.normalizeYemeniText('اشتريت دبات'), 'مشتريات دبات');
-      expect(YemeniDictionary.normalizeYemeniText('صرفت عشرين ألف'), 'مصروف عشرين ألف');
+      expect(
+          YemeniDictionary.normalizeYemeniText('اشتريت دبات'), 'مشتريات دبات');
+      expect(YemeniDictionary.normalizeYemeniText('صرفت عشرين ألف'),
+          'مصروف عشرين ألف');
     });
 
     test('Parse Yemeni Dialect Voice Command to JSON structure', () {
@@ -41,9 +47,12 @@ void main() {
       expect(json3['المبلغ'], 20000.0);
     });
 
-    test('Process voice command using Yemeni dictionary with Indexed SQLite persistence', () async {
+    test(
+        'Process voice command using Yemeni dictionary with Indexed SQLite persistence',
+        () async {
       String lastReply = '';
-      var result = await aiAgent.processVoiceCommandText('بعت بضاعة بمئة ألف', (reply) {
+      var result =
+          await aiAgent.processVoiceCommandText('بعت بضاعة بمئة ألف', (reply) {
         lastReply = reply;
       });
 

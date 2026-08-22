@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'seed_database.dart';
 
 class SeedScreen extends StatefulWidget {
-  const SeedScreen({Key? key}) : super(key: key);
+  const SeedScreen({super.key});
 
   @override
   State<SeedScreen> createState() => _SeedScreenState();
@@ -10,7 +10,8 @@ class SeedScreen extends StatefulWidget {
 
 class _SeedScreenState extends State<SeedScreen> {
   bool _isGenerating = false;
-  String _statusMessage = "جاهز لتوليد 10,000,000 عملية تجريبية في الخلفية على دفعات 50,000";
+  String _statusMessage =
+      "جاهز لتوليد 10,000,000 عملية تجريبية في الخلفية على دفعات 50,000";
   double _progress = 0.0;
 
   Future<void> _startSeed() async {
@@ -33,6 +34,7 @@ class _SeedScreenState extends State<SeedScreen> {
         _isGenerating = false;
         _statusMessage = "تم إنشاء 10,000,000 عملية بنجاح!";
       });
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("تم إنشاء 10,000,000 عملية بنجاح!")),
       );
@@ -54,8 +56,10 @@ class _SeedScreenState extends State<SeedScreen> {
       int count = await SeedDatabase.clearSeedData();
       setState(() {
         _isGenerating = false;
-        _statusMessage = "تم مسح $count سجل تجريبي بنجاح والحفاظ على بياناتك الحقيقية.";
+        _statusMessage =
+            "تم مسح $count سجل تجريبي بنجاح والحفاظ على بياناتك الحقيقية.";
       });
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("تم مسح $count سجل تجريبي بنجاح!")),
       );
@@ -85,7 +89,10 @@ class _SeedScreenState extends State<SeedScreen> {
             const Text(
               "توليد قاعدة بيانات تجريبية ضخمة",
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF0D47A1)),
+              style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF0D47A1)),
             ),
             const SizedBox(height: 10),
             const Text(
@@ -94,7 +101,11 @@ class _SeedScreenState extends State<SeedScreen> {
               style: TextStyle(fontSize: 14, color: Colors.grey),
             ),
             const SizedBox(height: 30),
-            LinearProgressIndicator(value: _progress, minHeight: 10, backgroundColor: Colors.grey.shade300, color: const Color(0xFFFFC107)),
+            LinearProgressIndicator(
+                value: _progress,
+                minHeight: 10,
+                backgroundColor: Colors.grey.shade300,
+                color: const Color(0xFFFFC107)),
             const SizedBox(height: 15),
             Text(
               _statusMessage,
@@ -107,11 +118,13 @@ class _SeedScreenState extends State<SeedScreen> {
                 backgroundColor: const Color(0xFF0D47A1),
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
               ),
               onPressed: _isGenerating ? null : _startSeed,
               icon: const Icon(Icons.play_arrow),
-              label: const Text("توليد 10 مليون عملية في الخلفية", style: TextStyle(fontSize: 16)),
+              label: const Text("توليد 10 مليون عملية في الخلفية",
+                  style: TextStyle(fontSize: 16)),
             ),
             const SizedBox(height: 15),
             OutlinedButton.icon(
@@ -119,11 +132,13 @@ class _SeedScreenState extends State<SeedScreen> {
                 foregroundColor: Colors.red.shade700,
                 side: BorderSide(color: Colors.red.shade700),
                 padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
               ),
               onPressed: _isGenerating ? null : _clearSeed,
               icon: const Icon(Icons.delete_sweep),
-              label: const Text("مسح البيانات التجريبية", style: TextStyle(fontSize: 16)),
+              label: const Text("مسح البيانات التجريبية",
+                  style: TextStyle(fontSize: 16)),
             ),
           ],
         ),

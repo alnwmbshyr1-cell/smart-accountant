@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import 'yemeni_dictionary.dart';
 import 'ai_agent_service.dart';
 
 class DictionaryTestScreen extends StatefulWidget {
-  const DictionaryTestScreen({Key? key}) : super(key: key);
+  const DictionaryTestScreen({super.key});
 
   @override
   State<DictionaryTestScreen> createState() => _DictionaryTestScreenState();
@@ -12,8 +11,9 @@ class DictionaryTestScreen extends StatefulWidget {
 class _DictionaryTestScreenState extends State<DictionaryTestScreen> {
   final AiAgentService _aiAgent = AiAgentService();
   final TextEditingController _customController = TextEditingController();
-  
-  String _testResult = "اختر عبارة من القاموس أدناه أو اكتب جملة يمنية لاختبارها فوراً";
+
+  String _testResult =
+      "اختر عبارة من القاموس أدناه أو اكتب جملة يمنية لاختبارها فوراً";
   bool _isLoading = false;
 
   final List<String> samplePhrases = [
@@ -64,7 +64,10 @@ class _DictionaryTestScreenState extends State<DictionaryTestScreen> {
           children: [
             const Text(
               "اختر عبارة يمنية معتمدة لاختبار المحلل الصوتي والمالي فوراً:",
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0D47A1)),
+              style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF0D47A1)),
             ),
             const SizedBox(height: 10),
             Expanded(
@@ -77,8 +80,10 @@ class _DictionaryTestScreenState extends State<DictionaryTestScreen> {
                     elevation: 2,
                     margin: const EdgeInsets.symmetric(vertical: 4),
                     child: ListTile(
-                      title: Text(phrase, style: const TextStyle(fontWeight: FontWeight.w600)),
-                      trailing: const Icon(Icons.play_arrow, color: Color(0xFF0D47A1)),
+                      title: Text(phrase,
+                          style: const TextStyle(fontWeight: FontWeight.w600)),
+                      trailing: const Icon(Icons.play_arrow,
+                          color: Color(0xFF0D47A1)),
                       onTap: () => _runTest(phrase),
                     ),
                   );
@@ -90,7 +95,8 @@ class _DictionaryTestScreenState extends State<DictionaryTestScreen> {
               controller: _customController,
               decoration: InputDecoration(
                 labelText: "اكتب أي جملة أو أمر يمني تجريبي",
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 suffixIcon: IconButton(
                   icon: const Icon(Icons.send, color: Color(0xFF0D47A1)),
                   onPressed: () {
@@ -121,7 +127,10 @@ class _DictionaryTestScreenState extends State<DictionaryTestScreen> {
                       ? const Center(child: CircularProgressIndicator())
                       : Text(
                           _testResult,
-                          style: const TextStyle(fontSize: 14, height: 1.5, fontFamily: 'monospace'),
+                          style: const TextStyle(
+                              fontSize: 14,
+                              height: 1.5,
+                              fontFamily: 'monospace'),
                         ),
                 ),
               ),

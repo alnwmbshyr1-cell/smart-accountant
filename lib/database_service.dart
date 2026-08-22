@@ -54,12 +54,14 @@ class DatabaseService {
             await txn.insert(
               _tableName,
               {
-                'id': map['id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
+                'id': map['id'] ??
+                    DateTime.now().millisecondsSinceEpoch.toString(),
                 'type': map['type'] ?? 'مصروف',
                 'amount': (map['amount'] as num?)?.toDouble() ?? 0.0,
                 'description': map['description'] ?? '',
                 'date': map['date'] ?? DateTime.now().toIso8601String(),
-                'is_seed': (map['is_seed'] == true || map['is_seed'] == 1) ? 1 : 0,
+                'is_seed':
+                    (map['is_seed'] == true || map['is_seed'] == 1) ? 1 : 0,
               },
               conflictAlgorithm: ConflictAlgorithm.replace,
             );
@@ -79,8 +81,9 @@ class DatabaseService {
   }) async {
     await migrateFromSharedPreferencesIfNeeded();
     final db = await database;
-    final id = DateTime.now().millisecondsSinceEpoch.toString() + '_' + DateTime.now().microsecond.toString();
-    
+    final id =
+        '${DateTime.now().millisecondsSinceEpoch}_${DateTime.now().microsecond}';
+
     await db.insert(
       _tableName,
       {
@@ -99,11 +102,12 @@ class DatabaseService {
   Future<void> insertBatchTransactions(List<Map<String, dynamic>> batch) async {
     await migrateFromSharedPreferencesIfNeeded();
     final db = await database;
-    
+
     await db.transaction((txn) async {
       for (int i = 0; i < batch.length; i++) {
         final map = batch[i];
-        final id = DateTime.now().millisecondsSinceEpoch.toString() + '_b_${i}_${map.hashCode}';
+        final id =
+            '${DateTime.now().millisecondsSinceEpoch}_b_${i}_${map.hashCode}';
         await txn.insert(
           _tableName,
           {
@@ -129,7 +133,8 @@ class DatabaseService {
   Future<List<Map<String, dynamic>>> getTransactions() async {
     await migrateFromSharedPreferencesIfNeeded();
     final db = await database;
-    final result = await db.query(_tableName, orderBy: 'date DESC, id DESC', limit: 100);
+    final result =
+        await db.query(_tableName, orderBy: 'date DESC, id DESC', limit: 100);
     return result;
   }
 
@@ -164,7 +169,7 @@ class DatabaseService {
     final db = await database;
     final now = DateTime.now();
     final startOfDay = DateTime(now.year, now.month, now.day).toIso8601String();
-    
+
     final result = await db.rawQuery(
       'SELECT SUM(amount) as total FROM $_tableName WHERE type = ? AND date >= ?',
       [type, startOfDay],
@@ -180,7 +185,7 @@ class DatabaseService {
     await migrateFromSharedPreferencesIfNeeded();
     final db = await database;
     query = '%$query%';
-    
+
     final result = await db.query(
       _tableName,
       where: 'description LIKE ? OR type LIKE ?',
@@ -194,7 +199,7 @@ class DatabaseService {
   Future<double> getBalance() async {
     await migrateFromSharedPreferencesIfNeeded();
     final db = await database;
-    
+
     final result = await db.rawQuery('''
       SELECT 
         SUM(CASE WHEN type IN ('ايراد', 'مبيعات', 'دين لك') THEN amount ELSE 0 END) as income,
@@ -209,6 +214,45 @@ class DatabaseService {
     }
     return 0.0;
   }
+
+  Future<List<Map<String, dynamic>>> getMonthlyProfitSummary({
+    int months = 6,
+  }) async {
+    await migrateFromSharedPreferencesIfNeeded();
+    final db = await database;
+    final rows = await db.rawQuery('''
+      SELECT
+        substr(date, 1, 7) AS month,
+        COALESCE(SUM(CASE WHEN type IN ('مبيعات', 'ايراد') THEN amount ELSE 0 END), 0) AS sales,
+        COALESCE(SUM(CASE WHEN type IN ('مشتريات', 'مصروف') THEN amount ELSE 0 END), 0) AS expenses
+      FROM $_tableName
+      GROUP BY substr(date, 1, 7)
+      ORDER BY month DESC
+      LIMIT ?
+    ''', [months]);
+
+    return rows
+        .map((row) {
+          final sales = (row['sales'] as num?)?.toDouble() ?? 0.0;
+          final expenses = (row['expenses'] as num?)?.toDouble() ?? 0.0;
+          return {
+            'month': row['month']?.toString() ?? '',
+            'sales': sales,
+            'expenses': expenses,
+            'profit': sales - expenses,
+          };
+        })
+        .toList()
+        .reversed
+        .toList();
+  }
+
+  /// إغلاق الاتصال المشترك للاختبارات فقط ومنع تسرب قفل SQLite.
+  Future<void> closeForTesting() async {
+    final current = _database;
+    _database = null;
+    if (current != null) {
+      await current.close();
+    }
+  }
 }
-
-

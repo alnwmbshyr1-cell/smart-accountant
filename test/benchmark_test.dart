@@ -13,14 +13,40 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
+  tearDown(() async {
+    await DatabaseService().closeForTesting();
+  });
+
   group('v3.2.0 Memory & Performance Benchmark Tests', () {
-    test('Verify Keyset Pagination fetches pages correctly without loading all records', () async {
+    test(
+        'Verify Keyset Pagination fetches pages correctly without loading all records',
+        () async {
       final dbService = DatabaseService();
+      final db = await dbService.database;
+      await db.delete('transactions');
 
       await dbService.insertBatchTransactions([
-        {'type': 'مبيعات', 'amount': 1000.0, 'description': 'اختبار 1', 'date': '2026-08-22T12:00:00.000', 'is_seed': 1},
-        {'type': 'مشتريات', 'amount': 2000.0, 'description': 'اختبار 2', 'date': '2026-08-22T11:00:00.000', 'is_seed': 1},
-        {'type': 'مصروف', 'amount': 500.0, 'description': 'اختبار 3', 'date': '2026-08-22T10:00:00.000', 'is_seed': 1},
+        {
+          'type': 'مبيعات',
+          'amount': 1000.0,
+          'description': 'اختبار 1',
+          'date': '2026-08-22T12:00:00.000',
+          'is_seed': 1
+        },
+        {
+          'type': 'مشتريات',
+          'amount': 2000.0,
+          'description': 'اختبار 2',
+          'date': '2026-08-22T11:00:00.000',
+          'is_seed': 1
+        },
+        {
+          'type': 'مصروف',
+          'amount': 500.0,
+          'description': 'اختبار 3',
+          'date': '2026-08-22T10:00:00.000',
+          'is_seed': 1
+        },
       ]);
 
       final page1 = await dbService.getTransactionsPage(limit: 2);
@@ -38,10 +64,12 @@ void main() {
       expect(page2[0]['description'], 'اختبار 3');
     });
 
-    test('Verify Gemma Isolate processes command and returns JSON safely', () async {
+    test('Verify Gemma Isolate processes command and returns JSON safely',
+        () async {
       await GemmaIsolateService.initIsolate();
-      
-      final result = await GemmaIsolateService.processCommandInIsolate('مبيعات بمليون ريال');
+
+      final result = await GemmaIsolateService.processCommandInIsolate(
+          'مبيعات بمليون ريال');
       expect(result['النوع'], 'مبيعات');
       expect(result['المبلغ'], 1000000.0);
 

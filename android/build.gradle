@@ -1,11 +1,11 @@
 buildscript {
-    ext.kotlin_version = '1.9.22'
+    ext.kotlin_version = '2.2.20'
     repositories {
         google()
         mavenCentral()
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:8.1.0'
+        classpath 'com.android.tools.build:gradle:8.11.1'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
     }
 }
@@ -23,6 +23,18 @@ subprojects {
 }
 subprojects {
     project.evaluationDependsOn(':app')
+}
+
+// vosk_flutter 0.3.x predates AGP 8 namespace enforcement.
+subprojects {
+    afterEvaluate { project ->
+        if (project.name == 'vosk_flutter') {
+            def androidExtension = project.extensions.findByName('android')
+            if (androidExtension != null && androidExtension.hasProperty('namespace')) {
+                androidExtension.namespace = 'org.vosk.vosk_flutter'
+            }
+        }
+    }
 }
 
 tasks.register("clean", Delete) {
