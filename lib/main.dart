@@ -13,6 +13,7 @@ import 'database_service.dart';
 import 'providers.dart';
 import 'profit_report_screen.dart';
 import 'export_service.dart';
+import 'services/permission_service.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -114,6 +115,7 @@ class _MainDashboardScreenState extends ConsumerState<MainDashboardScreen> {
   int _currentIndex = 0;
   late final AiAgentService _aiAgent;
   late final DatabaseService _db;
+  final PermissionService _permissions = const PermissionService();
 
   bool _isListening = false;
   bool _isRecording = false;
@@ -144,7 +146,7 @@ class _MainDashboardScreenState extends ConsumerState<MainDashboardScreen> {
     _db = ref.read(databaseServiceProvider);
     _transactionsController.addListener(_onTransactionsScroll);
     if (widget.enableNativeServices) {
-      _initSpeechAndAgent();
+      _prepareVoiceFeatures();
       _loadData();
     }
   }
@@ -161,6 +163,53 @@ class _MainDashboardScreenState extends ConsumerState<MainDashboardScreen> {
     if (_transactionsController.position.extentAfter < 600) {
       _loadNextTransactionsPage();
     }
+  }
+
+  Future<void> _prepareVoiceFeatures() async {
+    if (!mounted) return;
+    setState(() => _isVoiceInitializing = true);
+    final result = await _permissions.requestForVoiceAssistant();
+    if (!result.microphoneGranted) {
+      if (!mounted) return;
+      setState(() {
+        _isVoiceInitializing = false;
+        _assistantStatus = result.microphonePermanentlyDenied
+            ? 'صلاحية الميكروفون مرفوضة نهائياً؛ افتح إعدادات النظام لتفعيلها.'
+            : 'نحتاج صلاحية الميكروفون لتشغيل المحاسب الصوتي.';
+      });
+      if (result.microphonePermanentlyDenied) {
+        _showPermissionSettingsSnackBar();
+      }
+      return;
+    }
+    await _initSpeechAndAgent();
+  }
+
+  void _showPermissionSettingsSnackBar() {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('يمكنك تفعيل الميكروفون من إعدادات النظام.'),
+        action: SnackBarAction(
+          label: 'فتح الإعدادات',
+          onPressed: () => _permissions.openSettings(),
+        ),
+      ),
+    );
+  }
+
+  Future<bool> _ensureMicrophonePermission() async {
+    final result = await _permissions.requestMicrophone();
+    if (result.microphoneGranted) return true;
+    if (result.microphonePermanentlyDenied) {
+      _showPermissionSettingsSnackBar();
+    }
+    if (mounted) {
+      setState(() {
+        _assistantStatus = 'لا يمكن التسجيل قبل السماح بالوصول إلى الميكروفون.';
+      });
+    }
+    return false;
   }
 
   Future<void> _initSpeechAndAgent() async {
@@ -454,6 +503,7 @@ class _MainDashboardScreenState extends ConsumerState<MainDashboardScreen> {
 
   Future<void> _startTimedVoiceCapture() async {
     if (_isVoiceInitializing || _isListening || _isRecording) return;
+    if (!await _ensureMicrophonePermission()) return;
     setState(() {
       _isListening = true;
       _isRecording = true;
