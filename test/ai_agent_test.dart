@@ -2,15 +2,18 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:smart_accountant/ai_agent_service.dart';
 import 'package:smart_accountant/yemeni_dictionary.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  sqfliteFfiInit();
+  databaseFactory = databaseFactoryFfi;
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  group('v2.6.0 Yemeni Dialect Dictionary & Offline AI Tests', () {
+  group('v3.1.0 Indexed SQLite & Yemeni Dialect Tests', () {
     final aiAgent = AiAgentService();
 
     test('Verify Yemeni Dictionary normalization for local slang terms', () {
@@ -33,7 +36,7 @@ void main() {
       expect(json3['المبلغ'], 20000.0);
     });
 
-    test('Process voice command using Yemeni dictionary with SQLite persistence', () async {
+    test('Process voice command using Yemeni dictionary with Indexed SQLite persistence', () async {
       String lastReply = '';
       var result = await aiAgent.processVoiceCommandText('بعت بضاعة بمئة ألف', (reply) {
         lastReply = reply;

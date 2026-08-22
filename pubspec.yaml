@@ -1,7 +1,7 @@
 name: smart_accountant
 description: "Smart Accountant - المحاسب الذكي لتسجيل العمليات وحسابات المبيعات والمشتريات والديون مع حاسبة ذكية وتصدير PDF."
 publish_to: 'none'
-version: 3.0.1+1
+version: 3.1.0+1
 
 environment:
   sdk: '>=3.5.0 <4.0.0'
@@ -13,7 +13,9 @@ dependencies:
     sdk: flutter
   cupertino_icons: ^1.0.6
   intl: ^0.19.0
-  shared_preferences: ^2.2.2
+  shared_preferences: ^2.2.3
+  sqflite: ^2.3.3
+  path: ^1.9.0
   pdf: ^3.10.7
   path_provider: ^2.1.2
   open_file: ^3.3.2
@@ -25,7 +27,8 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^3.0.0
+  flutter_lints: ^3.0.2
+  sqflite_common_ffi: ^2.3.3
 
 dependency_overrides:
   intl: ^0.19.0
