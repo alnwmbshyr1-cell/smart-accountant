@@ -74,10 +74,11 @@ class GeminiService {
 أنت محاسب يمني دقيق. استخرج من الجملة التالية عملية محاسبية واحدة.
 أرجع JSON صالحاً فقط، دون Markdown أو شرح أو نص إضافي.
 المخطط الإلزامي:
-{"type":"ايراد" أو "مصروف","amount": رقم موجب,"desc":"وصف قصير"}
+{"type":"مبيعات" أو "مشتريات" أو "مصروف" أو "دين_لي" أو "دين_علي" أو "مخزون","amount": رقم موجب,"desc":"وصف قصير","name":"اسم الشخص أو الصنف","quantity": رقم اختياري}
 القواعد:
-- النوع يجب أن يكون "ايراد" أو "مصروف" فقط.
+- النوع يطابق المعنى: البيع/الدخل مبيعات، الشراء مشتريات، المصروف مصروف، ما لي عند الآخرين دين_لي، ما علي للآخرين دين_علي، إضافة أو نقص البضاعة مخزون.
 - amount رقم عشري موجب بلا فواصل أو عملة.
+- quantity رقم موجب عند وجود عدد/كمية، وإلا 1.
 - حوّل الألف والمليون والصيغ العربية إلى رقم.
 - إذا لم يتضح المبلغ، أرجع amount بقيمة 0.
 - إذا لم يتضح النوع، استخدم "مصروف".
@@ -123,13 +124,7 @@ class GeminiService {
 
   Map<String, dynamic>? _validatePayload(Map<String, dynamic> payload) {
     final rawType = (payload['type'] ?? payload['النوع'] ?? '').toString();
-    final type = rawType.contains('ايراد') ||
-            rawType.contains('إيراد') ||
-            rawType.contains('مبيعات')
-        ? 'ايراد'
-        : rawType.contains('مصروف') || rawType.contains('مشتريات')
-            ? 'مصروف'
-            : null;
+    final type = _canonicalType(rawType);
     if (type == null) return null;
 
     final amountValue = payload['amount'] ?? payload['المبلغ'];
@@ -138,16 +133,58 @@ class GeminiService {
         : double.tryParse(amountValue?.toString().replaceAll(',', '') ?? '');
     if (amount == null || !amount.isFinite || amount < 0) return null;
 
-    final description =
-        (payload['desc'] ?? payload['description'] ?? payload['الوصف'] ?? '')
-            .toString()
-            .trim();
+    final description = (payload['desc'] ??
+            payload['description'] ??
+            payload['الوصف'] ??
+            payload['name'] ??
+            payload['الاسم'] ??
+            '')
+        .toString()
+        .trim();
     if (description.isEmpty) return null;
+
+    final quantityValue = payload['quantity'] ?? payload['الكمية'] ?? 1;
+    final quantity = quantityValue is num
+        ? quantityValue.toDouble()
+        : double.tryParse(quantityValue.toString()) ?? 1;
 
     return <String, dynamic>{
       'type': type,
       'amount': amount,
       'desc': description,
+      'name': (payload['name'] ?? payload['الاسم'] ?? description).toString(),
+      'quantity': quantity > 0 ? quantity : 1,
     };
+  }
+
+  String? _canonicalType(String rawType) {
+    final value = rawType.trim();
+    if (value.contains('مبيعات') ||
+        value.contains('ايراد') ||
+        value.contains('إيراد')) {
+      return 'مبيعات';
+    }
+    if (value.contains('مشتريات') || value.contains('شراء')) {
+      return 'مشتريات';
+    }
+    if (value.contains('دين_لي') ||
+        value.contains('دين لي') ||
+        value.contains('لي عند')) {
+      return 'دين_لي';
+    }
+    if (value.contains('دين_علي') ||
+        value.contains('دين علي') ||
+        value.contains('علي دين')) {
+      return 'دين_علي';
+    }
+    if (value.contains('مخزون') ||
+        value.contains('مخزن') ||
+        value.contains('بضاعة')) {
+      return 'مخزون';
+    }
+    if (value.contains('مصروف') || value.contains('نفقة')) {
+      return 'مصروف';
+    }
+    return null;
   }
 }

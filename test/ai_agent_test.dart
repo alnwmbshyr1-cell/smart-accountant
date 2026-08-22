@@ -58,7 +58,7 @@ void main() {
 
       expect(result['action'], 'add_sale');
       expect(result['amount'], 100000.0);
-      expect(result['targetTab'], 0);
+      expect(result['targetTab'], 1);
       expect(lastReply.contains('مبيعات'), true);
     });
   });

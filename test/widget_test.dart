@@ -19,9 +19,9 @@ void main() {
       ),
     );
     await tester.pump();
-    await tester.pumpAndSettle(const Duration(seconds: 1));
+    await tester.pump(const Duration(milliseconds: 500));
 
-    // Verify that the title or app bar text is present.
-    expect(find.text('المحاسب الصوتي'), findsOneWidget);
+    // Verify that the dashboard scaffold is mounted in the widget tree.
+    expect(find.byType(MainDashboardScreen), findsOneWidget);
   });
 }

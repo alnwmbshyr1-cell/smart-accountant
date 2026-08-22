@@ -137,10 +137,10 @@
 - [x] تنفيذ flutter clean وflutter pub get
 - [x] تشغيل flutter analyze بنتيجة 0 أخطاء
 - [x] تشغيل flutter test بنتيجة 6 اختبارات ناجحة
-- [ ] تشغيل flutter build apk --release
-- [ ] التحقق من build/app/outputs/flutter-apk/app-release.apk
+- [x] تشغيل flutter build apk --release عبر GitHub Actions بنجاح
+- [x] التحقق من build/app/outputs/flutter-apk/app-release.apk ورفع الأصل إلى Release
 - [x] إنشاء README.txt بتعليمات التثبيت ومفتاح Gemini
-- [ ] تسليم APK وREADME.txt معاً
+- [x] تسليم APK وREADME.txt معاً
 
 - [x] تحديث اختبار الواجهة ليتحقق من اسم الإصدار الجديد «المحاسب الصوتي»
 
@@ -154,7 +154,25 @@
 
 
 ## Complete build execution
-- [ ] تنفيذ البناء الكامل للإصدار الحالي بعد إصلاح عوائق Gradle والشبكة
-- [ ] التحقق من APK Release وREADME وتسليمهما إن نجح البناء
-- [ ] إصلاح namespace المفقود في vosk_flutter ليتوافق مع AGP 8.11.1
-- [ ] إصلاح استخدام afterEvaluate غير الصالح في إعداد namespace لـ vosk_flutter
+- [x] تنفيذ البناء الكامل للإصدار الحالي بعد إصلاح عوائق Gradle والشبكة
+- [x] التحقق من APK Release وREADME وتسليمهما إن نجح البناء
+- [x] إصلاح namespace المفقود في vosk_flutter ليتوافق مع AGP 8.11.1
+- [x] استبدال afterEvaluate غير الصالح بحل plugins.withId لتعيين namespace لـ vosk_flutter
+
+
+## Vosk initialization guard
+- [ ] منع تهيئة Vosk مرتين ومعالجة LateInitializationError
+- [ ] تعطيل زر المايك أثناء تهيئة Vosk
+- [ ] إضافة dispose آمن لخدمة Vosk وتشغيل الفحوصات
+
+
+## Pro voice accounting workflow
+- [ ] ربط المايكروفون بالأوامر الصوتية للدين لي والدين علي والمبيعات والمشتريات والمخزون والرفع
+- [ ] توحيد نموذج الأوامر الصوتية والتحقق من المبلغ والنوع والوصف والجهة
+- [ ] ربط كل نوع عملية بقاعدة البيانات وتحديث الأرصدة والمخزون
+- [ ] إظهار نتيجة العملية في الواجهة وإصدار رد صوتي مؤكد بعد الحفظ الفعلي
+- [ ] إضافة اختبارات لكل أنواع الأوامر الصوتية وسيناريوهات الفشل
+- [ ] إصلاح أولوية تصنيف عبارة «بعت بضاعة» حتى لا تُصنف كمخزون
+- [ ] جعل اختبار الواجهة لا ينتظر استقراراً لا نهائياً بسبب الأنيميشن
+- [ ] تحديث توقع targetTab للمبيعات من الرئيسية إلى شاشة المبيعات والمشتريات
+- [ ] تجاوز كاش Kotlin DSL التالف metadata.bin باستخدام GRADLE_USER_HOME معزول ثم إعادة بناء APK

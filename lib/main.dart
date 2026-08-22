@@ -118,6 +118,7 @@ class _MainDashboardScreenState extends ConsumerState<MainDashboardScreen> {
   bool _isListening = false;
   bool _isRecording = false;
   bool _isLoading = false;
+  bool _isVoiceInitializing = true;
   bool _wakeWordEnabled = true;
   String _lastWords = "";
   String _assistantStatus =
@@ -163,9 +164,14 @@ class _MainDashboardScreenState extends ConsumerState<MainDashboardScreen> {
   }
 
   Future<void> _initSpeechAndAgent() async {
-    await _aiAgent.init();
-    if (_wakeWordEnabled) {
-      await _startWakeWordMode();
+    if (mounted) setState(() => _isVoiceInitializing = true);
+    try {
+      await _aiAgent.init();
+      if (_wakeWordEnabled) {
+        await _startWakeWordMode();
+      }
+    } finally {
+      if (mounted) setState(() => _isVoiceInitializing = false);
     }
   }
 
@@ -445,7 +451,7 @@ class _MainDashboardScreenState extends ConsumerState<MainDashboardScreen> {
   }
 
   Future<void> _startTimedVoiceCapture() async {
-    if (_isListening || _isRecording) return;
+    if (_isVoiceInitializing || _isListening || _isRecording) return;
     setState(() {
       _isListening = true;
       _isRecording = true;
@@ -570,7 +576,7 @@ class _MainDashboardScreenState extends ConsumerState<MainDashboardScreen> {
         ),
       ),
       floatingActionButton: FloatingActionButton.large(
-        onPressed: _isLoading
+        onPressed: _isVoiceInitializing || _isLoading
             ? null
             : () {
                 if (_isListening) {
@@ -580,11 +586,20 @@ class _MainDashboardScreenState extends ConsumerState<MainDashboardScreen> {
                 }
               },
         backgroundColor: _isListening ? Colors.red : colorScheme.secondary,
-        child: Icon(
-          _isListening ? Symbols.stop : Symbols.mic,
-          size: 36,
-          color: _isListening ? Colors.white : Colors.black87,
-        ),
+        child: _isVoiceInitializing
+            ? const SizedBox(
+                width: 28,
+                height: 28,
+                child: CircularProgressIndicator(
+                  strokeWidth: 3,
+                  color: Colors.black87,
+                ),
+              )
+            : Icon(
+                _isListening ? Symbols.stop : Symbols.mic,
+                size: 36,
+                color: _isListening ? Colors.white : Colors.black87,
+              ),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       bottomNavigationBar: NavigationBar(

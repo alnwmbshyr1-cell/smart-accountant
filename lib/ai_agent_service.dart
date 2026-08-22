@@ -1,13 +1,13 @@
 import 'dart:async';
 import 'package:flutter_tts/flutter_tts.dart';
-import 'package:path/path.dart' as p;
 import 'package:porcupine_flutter/porcupine_manager.dart';
 import 'dart:convert';
 
-import 'package:vosk_flutter/vosk_flutter.dart';
+import 'services/vosk_service.dart';
 import 'database_service.dart';
 import 'services/gemini_service.dart';
 import 'yemeni_dictionary.dart';
+import 'ai_agent_parser.dart';
 
 class AiAgentService {
   AiAgentService({GeminiService? gemini}) : _gemini = gemini ?? GeminiService();
@@ -23,11 +23,7 @@ class AiAgentService {
   bool _porcupineActive = false;
   Timer? _commandTimer;
   String _commandText = '';
-  late final VoskFlutterPlugin _vosk;
-  late final ModelLoader _modelLoader;
-  Model? _voskModel;
-  Recognizer? _voskRecognizer;
-  SpeechService? _voskSpeechService;
+  final VoskService _voskService = VoskService();
   StreamSubscription<String>? _partialSubscription;
   StreamSubscription<String>? _resultSubscription;
   PorcupineManager? _porcupineManager;
@@ -47,25 +43,7 @@ class AiAgentService {
     } catch (_) {}
   }
 
-  Future<void> _initVosk() async {
-    if (_voskRecognizer != null) return;
-    _vosk = VoskFlutterPlugin.instance();
-    _modelLoader = ModelLoader();
-    // النموذج الرسمي يُحمّل مرة واحدة عند أول تشغيل لتقليل حجم APK.
-    // بعد فك الضغط يبقى في مجلد التطبيق ويعمل Vosk دون إنترنت.
-    const modelUrl =
-        'https://alphacephei.com/vosk/models/vosk-model-ar-mgb2-0.4.zip';
-    final modelName = p.basenameWithoutExtension(modelUrl);
-    final alreadyLoaded = await _modelLoader.isModelAlreadyLoaded(modelName);
-    final modelPath = alreadyLoaded
-        ? await _modelLoader.modelPath(modelName)
-        : await _modelLoader.loadFromNetwork(modelUrl);
-    _voskModel = await _vosk.createModel(modelPath);
-    _voskRecognizer = await _vosk.createRecognizer(
-      model: _voskModel!,
-      sampleRate: 16000,
-    );
-  }
+  Future<void> _initVosk() => _voskService.init();
 
   void startAssistant() {
     _isAssistantMode = true;
@@ -126,8 +104,7 @@ class AiAgentService {
     if (!_wakeWordEnabled || _commandMode) return;
     try {
       await _initVosk();
-      final service = _voskSpeechService ??=
-          await _vosk.initSpeechService(_voskRecognizer!);
+      final service = await _voskService.ensureSpeechService();
       await _partialSubscription?.cancel();
       _partialSubscription = service.onPartial().listen((raw) {
         final text = _extractVoskText(raw);
@@ -147,7 +124,7 @@ class AiAgentService {
   Future<void> _handleWakeWord() async {
     if (!_wakeWordEnabled || _commandMode) return;
     _commandMode = true;
-    await _voskSpeechService?.stop();
+    await _voskService.stop();
     _onWakeStatus?.call('تم التعرف على كلمة التنشيط');
     await speakYemeni('نعم يا شيخ');
     await _onWakeWord?.call();
@@ -158,10 +135,9 @@ class AiAgentService {
     if (!_wakeWordEnabled) return;
     _commandText = '';
     try {
-      await _voskSpeechService?.stop();
+      await _voskService.stop();
       await _resultSubscription?.cancel();
-      final service = _voskSpeechService ??=
-          await _vosk.initSpeechService(_voskRecognizer!);
+      final service = await _voskService.ensureSpeechService();
       _resultSubscription = service.onResult().listen((raw) {
         final text = _extractVoskText(raw);
         if (text.isNotEmpty) _commandText = text;
@@ -179,7 +155,7 @@ class AiAgentService {
 
   Future<void> _finishFiveSecondCommandCapture() async {
     _commandTimer?.cancel();
-    await _voskSpeechService?.stop();
+    await _voskService.stop();
     final command = _commandText.trim();
     if (command.isNotEmpty) {
       await _onCommand?.call(command);
@@ -198,7 +174,7 @@ class AiAgentService {
     _commandTimer?.cancel();
     _commandTimer = null;
     try {
-      await _voskSpeechService?.stop();
+      await _voskService.stop();
       await _partialSubscription?.cancel();
       await _resultSubscription?.cancel();
     } catch (_) {}
@@ -214,9 +190,7 @@ class AiAgentService {
 
   Future<void> disposeVoiceResources() async {
     await stopWakeWordListening();
-    await _voskSpeechService?.dispose();
-    await _voskRecognizer?.dispose();
-    _voskModel?.dispose();
+    await _voskService.dispose();
   }
 
   static String _extractVoskText(String raw) {
@@ -245,10 +219,9 @@ class AiAgentService {
     try {
       await _initVosk();
       _commandText = '';
-      await _voskSpeechService?.stop();
+      await _voskService.stop();
       await _resultSubscription?.cancel();
-      final service = _voskSpeechService ??=
-          await _vosk.initSpeechService(_voskRecognizer!);
+      final service = await _voskService.ensureSpeechService();
       _resultSubscription = service.onResult().listen((raw) {
         final text = _extractVoskText(raw).trim();
         if (text.isNotEmpty) _commandText = text;
@@ -256,7 +229,7 @@ class AiAgentService {
       await service.start();
       await Future<void>.delayed(const Duration(seconds: 10));
       await service.stop();
-      final finalRaw = await _voskRecognizer!.getFinalResult();
+      final finalRaw = await _voskService.recognizer!.getFinalResult();
       final finalText = _extractVoskText(finalRaw).trim();
       if (finalText.isNotEmpty) _commandText = finalText;
       await _resultSubscription?.cancel();
@@ -305,55 +278,7 @@ class AiAgentService {
   }
 
   Map<String, dynamic> parseCommandToJson(String voiceText) {
-    // تطبيق قاموس اللهجة اليمنية أولاً
-    String normalized = YemeniDictionary.normalizeYemeniText(voiceText);
-    String lower = normalized.toLowerCase();
-    double amount = parseArabicNumber(voiceText);
-    String type = "مصروف";
-    String name = "عام";
-    int targetTab = 0;
-
-    if (lower.contains("مبيعات") || lower.contains("بيع")) {
-      type = "مبيعات";
-      targetTab = 0;
-      if (amount <= 0) amount = 1000000;
-    } else if (lower.contains("مشتريات")) {
-      type = "مشتريات";
-      targetTab = 1;
-      if (amount <= 0) amount = 50000;
-    } else if (lower.contains("دين_لي") ||
-        lower.contains("على فلان") ||
-        lower.contains("في ذمته")) {
-      type = "دين_لي";
-      targetTab = 2;
-      if (amount <= 0) amount = 100000;
-    } else if (lower.contains("دين_علي") ||
-        lower.contains("ديني") ||
-        lower.startsWith("علي دين")) {
-      type = "دين_علي";
-      targetTab = 2;
-      if (amount <= 0) amount = 50000;
-    } else {
-      type = "مصروف";
-      targetTab = 0;
-      if (amount <= 0) amount = 20000;
-    }
-
-    if (lower.contains("على ")) {
-      var parts = voiceText.split("على ");
-      if (parts.length > 1) {
-        name = parts[1].split(" ")[0];
-      }
-    } else if (lower.contains("لاحمد") || lower.contains("لأحمد")) {
-      name = "أحمد";
-    }
-
-    return {
-      "النوع": type,
-      "الاسم": name,
-      "المبلغ": amount,
-      "targetTab": targetTab
-    };
+    return AiAgentParser.parseCommandToJson(voiceText);
   }
 
   Future<Map<String, dynamic>> processVoiceCommandText(
@@ -419,9 +344,7 @@ class AiAgentService {
         .trim();
     final targetTab = jsonResult['targetTab'] is int
         ? jsonResult['targetTab'] as int
-        : semanticType == 'ايراد' || semanticType == 'مبيعات'
-            ? 0
-            : 0;
+        : _targetTabForType(semanticType);
 
     if (amount <= 0) {
       const message = 'كم المبلغ بالضبط يا شيخ؟';
@@ -435,22 +358,33 @@ class AiAgentService {
       };
     }
 
-    final isRevenue = semanticType == 'ايراد' || semanticType == 'مبيعات';
-    final dbType = isRevenue ? 'مبيعات' : 'مصروف';
-    final actionName = isRevenue ? 'add_sale' : 'add_expense';
-    final spokenAction = isRevenue ? 'مبيعات' : 'مصروف $description';
+    final canonicalType = _canonicalType(semanticType);
+    final actionName = switch (canonicalType) {
+      'مبيعات' => 'add_sale',
+      'مشتريات' => 'add_purchase',
+      'دين_لي' => 'add_debt_receivable',
+      'دين_علي' => 'add_debt_payable',
+      'مخزون' => 'add_inventory',
+      _ => 'add_expense',
+    };
+    final spokenAction = switch (canonicalType) {
+      'دين_لي' => 'دين لي على $description',
+      'دين_علي' => 'دين علي لـ $description',
+      'مخزون' => 'إضافة للمخزون $description',
+      _ => '$canonicalType $description',
+    };
 
     await _db.addTransaction(
-      type: dbType,
+      type: canonicalType,
       amount: amount,
       description: '$description (النص الصوتي: $voiceText)',
     );
 
-    final todayTotal = await _db.getTodayTotal(dbType);
+    final todayTotal = await _db.getTodayTotal(canonicalType);
     final formattedAmount = amount.toStringAsFixed(0);
     final formattedTotal = todayTotal.toStringAsFixed(0);
     final message =
-        'تم تسجيل $spokenAction بمبلغ $formattedAmount ريال. الإجمالي اليوم $formattedTotal ريال.';
+        'تم تسجيل $spokenAction بمبلغ $formattedAmount ريال. إجمالي $canonicalType اليوم $formattedTotal ريال.';
     onResult(message);
     await speakYemeni(message);
 
@@ -462,5 +396,31 @@ class AiAgentService {
       'targetTab': targetTab,
       'source': geminiResult == null ? 'local_fallback' : 'gemini',
     };
+  }
+
+  static String _canonicalType(String type) {
+    final value = type.trim();
+    if (value == 'ايراد' || value == 'إيراد') return 'مبيعات';
+    if (value == 'دين لك') return 'دين_لي';
+    if (value == 'دين عليك') return 'دين_علي';
+    if (value == 'مخزون' || value == 'مخزن') return 'مخزون';
+    if (value == 'مشتريات') return 'مشتريات';
+    if (value == 'مبيعات') return 'مبيعات';
+    return 'مصروف';
+  }
+
+  static int _targetTabForType(String type) {
+    switch (_canonicalType(type)) {
+      case 'مبيعات':
+      case 'مشتريات':
+        return 1;
+      case 'دين_لي':
+      case 'دين_علي':
+        return 2;
+      case 'مخزون':
+        return 3;
+      default:
+        return 0;
+    }
   }
 }
