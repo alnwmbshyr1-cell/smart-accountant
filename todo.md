@@ -18,3 +18,9 @@
 - [ ] تنفيذ التحميل التلقائي لموديل Gemma عبر Dio من GitHub Release (models) عند أول تشغيل
 - [ ] ضبط Gradle (minSdkVersion 24, arm64-v8a, minifyEnabled false)
 - [ ] بناء APK محلي وسحابي ناجح عبر GitHub Actions
+
+## v2.0.3 Tasks - Fix intl & Dependency Resolution
+- [ ] تعديل pubspec.yaml لضبط intl: ^0.19.0 وإصدار التطبيق v2.0.3
+- [ ] تشغيل flutter pub get والتحقق من عدم وجود تعارض مع flutter_localizations
+- [ ] تشغيل flutter analyze و flutter test
+- [ ] دفع التعديلات والوسم v2.0.3 إلى GitHub
