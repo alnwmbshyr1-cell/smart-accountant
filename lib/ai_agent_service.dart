@@ -2,8 +2,8 @@ import 'package:flutter_tts/flutter_tts.dart';
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
-import 'dart:convert';
 import 'database_service.dart';
+import 'yemeni_dictionary.dart';
 
 class AiAgentService {
   final FlutterTts _tts = FlutterTts();
@@ -60,13 +60,12 @@ class AiAgentService {
   double parseArabicNumber(String text) {
     String clean = text.toLowerCase();
     
-    if (clean.contains("مليار")) return 1000000000;
-    if (clean.contains("مليون")) return 1000000;
-    if (clean.contains("مئة الف") || clean.contains("مائة الف") || clean.contains("مئة ألف")) return 100000;
-    if (clean.contains("عشرين الف") || clean.contains("عشرون الف") || clean.contains("عشرين ألف")) return 20000;
-    if (clean.contains("خمسين الف") || clean.contains("خمسين ألف")) return 50000;
-    if (clean.contains("الفين") || clean.contains("ألفين")) return 2000;
-    if (clean.contains("الف") || clean.contains("ألف")) return 1000;
+    // فحص الكلمات من قاموس الأرقام اليمنية
+    for (var entry in YemeniDictionary.yemeniNumberWords.entries) {
+      if (clean.contains(entry.key)) {
+        return entry.value;
+      }
+    }
 
     RegExp regex = RegExp(r'(\d[\d,\.]*)');
     var match = regex.firstMatch(clean);
@@ -77,27 +76,28 @@ class AiAgentService {
     return 0.0;
   }
 
-  // محاكي الذكاء الاصطناعي المحلي لاستخراج JSON وتوليد الرد الصوتي الآمن
   Map<String, dynamic> parseCommandToJson(String voiceText) {
-    String lower = voiceText.toLowerCase();
+    // تطبيق قاموس اللهجة اليمنية أولاً
+    String normalized = YemeniDictionary.normalizeYemeniText(voiceText);
+    String lower = normalized.toLowerCase();
     double amount = parseArabicNumber(voiceText);
     String type = "مصروف";
     String name = "عام";
     int targetTab = 0;
 
-    if (lower.contains("بعت") || lower.contains("مبيعات") || lower.contains("بيع")) {
+    if (lower.contains("مبيعات") || lower.contains("بيع")) {
       type = "مبيعات";
       targetTab = 0;
       if (amount <= 0) amount = 1000000;
-    } else if (lower.contains("اشتريت") || lower.contains("مشتريات") || lower.contains("شريت")) {
+    } else if (lower.contains("مشتريات")) {
       type = "مشتريات";
       targetTab = 1;
       if (amount <= 0) amount = 50000;
-    } else if (lower.contains("دين لي") || (lower.contains("على") && (lower.contains("دين") || lower.contains("سلف")))) {
+    } else if (lower.contains("دين_لي") || lower.contains("على فلان") || lower.contains("في ذمته")) {
       type = "دين_لي";
       targetTab = 2;
       if (amount <= 0) amount = 100000;
-    } else if (lower.contains("دين علي") || lower.contains("ديني") || lower.contains("لي دين") || lower.startsWith("علي دين")) {
+    } else if (lower.contains("دين_علي") || lower.contains("ديني") || lower.startsWith("علي دين")) {
       type = "دين_علي";
       targetTab = 2;
       if (amount <= 0) amount = 50000;
@@ -107,7 +107,6 @@ class AiAgentService {
       if (amount <= 0) amount = 20000;
     }
 
-    // استخراج اسم الطرف إن وجدت
     if (lower.contains("على ")) {
       var parts = voiceText.split("على ");
       if (parts.length > 1) {
@@ -127,7 +126,8 @@ class AiAgentService {
 
   Future<Map<String, dynamic>> processVoiceCommandText(String voiceText, Function(String) onResult) async {
     await init();
-    String lower = voiceText.toLowerCase();
+    String normalized = YemeniDictionary.normalizeYemeniText(voiceText);
+    String lower = normalized.toLowerCase();
     
     if (lower.contains("كم صرفت") || lower.contains("تقرير اليوم") || lower.contains("المصروفات اليومية") || lower.contains("صرفت اليوم")) {
       double total = await _db.getTodayTotal('مصروف');
@@ -146,7 +146,6 @@ class AiAgentService {
       return {"action": "search", "query": query, "results": results, "reply": msg, "targetTab": 0};
     }
 
-    // تحليل الذكاء المحلي إلى JSON
     var jsonResult = parseCommandToJson(voiceText);
     String type = jsonResult["النوع"];
     double amount = jsonResult["المبلغ"];
@@ -175,11 +174,10 @@ class AiAgentService {
       spokenAction = "دين عليك";
     }
 
-    // الحفظ الفعلي في قاعدة البيانات SQLite
     await _db.addTransaction(
       type: dbType,
       amount: amount,
-      description: "$voiceText (الطرف: $name)",
+      description: "$voiceText (القاموس اليمني - الطرف: $name)",
     );
 
     String formattedAmount = amount.toStringAsFixed(0);
