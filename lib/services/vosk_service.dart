@@ -2,19 +2,52 @@ import 'dart:async';
 import 'package:path/path.dart' as p;
 import 'package:vosk_flutter/vosk_flutter.dart';
 
+/// Adapter for the model-loading operations used by [VoskService].
+///
+/// Keeping this boundary injectable makes unit tests deterministic: they can
+/// simulate an already-downloaded model or a network failure without invoking
+/// the real archive downloader.
+abstract interface class VoskModelLoaderAdapter {
+  Future<bool> isModelAlreadyLoaded(String modelName);
+  Future<String> modelPath(String modelName);
+  Future<String> loadFromNetwork(String modelUrl);
+}
+
+class DefaultVoskModelLoaderAdapter implements VoskModelLoaderAdapter {
+  DefaultVoskModelLoaderAdapter() : _loader = ModelLoader();
+
+  final ModelLoader _loader;
+
+  @override
+  Future<bool> isModelAlreadyLoaded(String modelName) =>
+      _loader.isModelAlreadyLoaded(modelName);
+
+  @override
+  Future<String> modelPath(String modelName) => _loader.modelPath(modelName);
+
+  @override
+  Future<String> loadFromNetwork(String modelUrl) =>
+      _loader.loadFromNetwork(modelUrl);
+}
+
 /// Lifecycle-safe Vosk wrapper.
 ///
 /// Multiple callers may request init at the same time (startup, wake word,
 /// and microphone button). A shared Future makes all callers await one init.
 class VoskService {
-  VoskService({VoskFlutterPlugin? plugin}) : _providedPlugin = plugin;
+  VoskService({
+    VoskFlutterPlugin? plugin,
+    VoskModelLoaderAdapter? modelLoader,
+  })  : _providedPlugin = plugin,
+        _providedModelLoader = modelLoader;
 
   final VoskFlutterPlugin? _providedPlugin;
+  final VoskModelLoaderAdapter? _providedModelLoader;
   VoskFlutterPlugin? _vosk;
 
   VoskFlutterPlugin get _plugin =>
       _vosk ??= _providedPlugin ?? VoskFlutterPlugin.instance();
-  late final ModelLoader _modelLoader;
+  VoskModelLoaderAdapter? _modelLoader;
 
   bool _isInitialized = false;
   bool _isInitializing = false;
@@ -41,7 +74,7 @@ class VoskService {
     if (running != null) return running;
 
     _isInitializing = true;
-    _modelLoader = ModelLoader();
+    _modelLoader ??= _providedModelLoader ?? DefaultVoskModelLoaderAdapter();
     final future = _initializeOnce();
     _initializationFuture = future;
     return future.whenComplete(() {
@@ -54,10 +87,11 @@ class VoskService {
     const modelUrl =
         'https://alphacephei.com/vosk/models/vosk-model-ar-mgb2-0.4.zip';
     final modelName = p.basenameWithoutExtension(modelUrl);
-    final alreadyLoaded = await _modelLoader.isModelAlreadyLoaded(modelName);
+    final loader = _modelLoader!;
+    final alreadyLoaded = await loader.isModelAlreadyLoaded(modelName);
     final modelPath = alreadyLoaded
-        ? await _modelLoader.modelPath(modelName)
-        : await _modelLoader.loadFromNetwork(modelUrl);
+        ? await loader.modelPath(modelName)
+        : await loader.loadFromNetwork(modelUrl);
 
     if (_isDisposed) return;
     final model = await _plugin.createModel(modelPath);
