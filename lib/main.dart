@@ -577,7 +577,7 @@ class _MainDashboardScreenState extends ConsumerState<MainDashboardScreen> {
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton.large(
+      floatingActionButton: FloatingActionButton(
         onPressed: _isVoiceInitializing || _isLoading
             ? null
             : () {
@@ -587,20 +587,27 @@ class _MainDashboardScreenState extends ConsumerState<MainDashboardScreen> {
                   _startTimedVoiceCapture();
                 }
               },
-        backgroundColor: _isListening ? Colors.red : colorScheme.secondary,
+        backgroundColor:
+            (_isListening || _isRecording) ? Colors.red : colorScheme.secondary,
+        foregroundColor:
+            (_isListening || _isRecording) ? Colors.white : Colors.black87,
+        tooltip:
+            (_isListening || _isRecording) ? 'إيقاف التسجيل' : 'بدء التسجيل',
         child: _isVoiceInitializing
             ? const SizedBox(
-                width: 28,
-                height: 28,
+                width: 22,
+                height: 22,
                 child: CircularProgressIndicator(
-                  strokeWidth: 3,
+                  strokeWidth: 2.5,
                   color: Colors.black87,
                 ),
               )
             : Icon(
-                _isListening ? Symbols.stop : Symbols.mic,
-                size: 36,
-                color: _isListening ? Colors.white : Colors.black87,
+                (_isListening || _isRecording) ? Symbols.stop : Symbols.mic,
+                size: 28,
+                color: (_isListening || _isRecording)
+                    ? Colors.white
+                    : Colors.black87,
               ),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
