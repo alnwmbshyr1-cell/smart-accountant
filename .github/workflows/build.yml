@@ -54,8 +54,24 @@ jobs:
           done
           exit 1
 
-      - name: Run tests with coverage
+      - name: Run integration workflow tests
+        run: flutter test test/integration_workflow_test.dart --concurrency=1
+
+      - name: Run all tests with coverage
         run: flutter test --coverage --concurrency=1
+
+      - name: Generate HTML coverage report
+        run: python3 tooling/generate_coverage_report.py
+
+      - name: Upload coverage artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smart-accountant-coverage-${{ github.sha }}
+          path: |
+            coverage/lcov.info
+            coverage/html/
+          if-no-files-found: error
 
       - name: Enforce minimum coverage
         shell: bash

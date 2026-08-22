@@ -313,3 +313,10 @@
 - [x] تحديث main.dart لاستخدام ExportService المحقون
 - [x] إضافة اختبارات FakeInvoicePrinter وFakeFileWriter للوحدة والواجهة
 - [x] تشغيل التحليل والاختبارات والتغطية ودفع التغييرات؛ ExportService 91.53%، GeminiService 89.66%، الإجمالي 77.62%
+
+
+## CI integration test pipeline
+- [x] تشغيل اختبارات الوحدة والتكامل معاً في GitHub Actions
+- [x] توليد وتخزين تقرير HTML وlcov كـ artifacts
+- [x] فرض حد التغطية قبل خطوة بناء APK
+- [x] التحقق من YAML ودفع workflow المحدث؛ 65 اختباراً ناجحاً و77.62% coverage
