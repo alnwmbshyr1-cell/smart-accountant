@@ -16,6 +16,7 @@ class GeminiService {
     this.modelName = 'gemini-1.5-flash',
     this.textProvider,
     this.apiKeyLoader,
+    this.timeout = requestTimeout,
   }) : _storage = storage ?? const FlutterSecureStorage();
 
   static const String apiKeyStorageKey = 'gemini_api_key';
@@ -25,6 +26,7 @@ class GeminiService {
   final String modelName;
   final GeminiTextProvider? textProvider;
   final GeminiApiKeyLoader? apiKeyLoader;
+  final Duration timeout;
   String? _cachedApiKey;
 
   Future<String?> readApiKey() async {
@@ -95,9 +97,9 @@ class GeminiService {
 ''';
 
       final raw = textProvider != null
-          ? (await textProvider!(prompt).timeout(requestTimeout))?.trim()
-          : (await model.generateContent([Content.text(prompt)]).timeout(
-                  requestTimeout))
+          ? (await textProvider!(prompt).timeout(timeout))?.trim()
+          : (await model
+                  .generateContent([Content.text(prompt)]).timeout(timeout))
               .text
               ?.trim();
       if (raw == null || raw.isEmpty) return null;

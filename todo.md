@@ -328,3 +328,11 @@
 - [x] إضافة سكريبت ci_local.sh متعدد الأوضاع إلى المستودع
 - [x] إضافة pre-push hook قابل للتثبيت والتحقق من commits قبل الرفع
 - [x] تشغيل التحقق المحلي ودفع ملفات CI الجديدة؛ fast نجح و65 اختباراً كاملة في آخر coverage
+
+
+## Reusable Flutter CI coverage skill and Gemini tests
+- [x] إنشاء مهارة reusable لخطوات fast/full/security وpre-push وcoverage
+- [x] إضافة موارد أو قوالب المهارة وتعليمات التشغيل والتحقق؛ quick_validate ناجح
+- [x] إضافة اختبارات GeminiService للتخزين المؤقت والمهلات والتطبيع والاستثناءات
+- [x] تشغيل quick_validate والتحليل والاختبارات وcoverage؛ Gemini 90.80%، الإجمالي 77.72%
+- [ ] دفع الاختبارات وتسليم SKILL.md للمستخدم

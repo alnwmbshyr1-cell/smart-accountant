@@ -138,4 +138,76 @@ void main() {
       expect(await providerFailure.processCommand('مصروف 10'), isNull);
     });
   });
+
+  group('GeminiService cache, timeout, and synonym coverage', () {
+    test('caches a valid API key and avoids a second key load', () async {
+      var loads = 0;
+      final service = GeminiService(
+        apiKeyLoader: () async {
+          loads++;
+          return 'cached-key';
+        },
+        textProvider: (_) async => '{"type":"مصروف","amount":10,"desc":"قهوة"}',
+      );
+
+      expect(await service.readApiKey(), 'cached-key');
+      expect(await service.readApiKey(), 'cached-key');
+      expect(loads, 1);
+      expect(await service.hasApiKey(), isTrue);
+    });
+
+    test('returns null quickly when the provider exceeds the injected timeout',
+        () async {
+      final service = GeminiService(
+        timeout: const Duration(milliseconds: 1),
+        apiKeyLoader: () async => 'timeout-key',
+        textProvider: (_) async {
+          await Future<void>.delayed(const Duration(milliseconds: 20));
+          return '{"type":"مصروف","amount":10,"desc":"اختبار"}';
+        },
+      );
+
+      expect(await service.processCommand('اختبار'), isNull);
+    });
+
+    test('maps supported Arabic type synonyms to canonical types', () async {
+      const synonyms = <String, String>{
+        'ايراد': 'مبيعات',
+        'إيراد': 'مبيعات',
+        'شراء': 'مشتريات',
+        'لي عند خالد': 'دين_لي',
+        'علي دين': 'دين_علي',
+        'مخزن': 'مخزون',
+        'بضاعة': 'مخزون',
+        'نفقة': 'مصروف',
+      };
+
+      for (final entry in synonyms.entries) {
+        final service = GeminiService(
+          apiKeyLoader: () async => 'key',
+          textProvider: (_) async =>
+              '{"type":"${entry.key}","amount":1,"desc":"اختبار"}',
+        );
+        final result = await service.processCommand('اختبار');
+        expect(result!['type'], entry.value);
+      }
+    });
+
+    test('uses fallback Arabic fields and defaults invalid quantity to one',
+        () async {
+      final service = GeminiService(
+        apiKeyLoader: () async => 'key',
+        textProvider: (_) async =>
+            '{"النوع":"مصروف","المبلغ":3,"الوصف":"ماء","الاسم":"ماء","الكمية":"invalid"}',
+      );
+
+      final result = await service.processCommand('اختبار');
+      expect(result, isNotNull);
+      expect(result!['type'], 'مصروف');
+      expect(result['amount'], 3);
+      expect(result['desc'], 'ماء');
+      expect(result['name'], 'ماء');
+      expect(result['quantity'], 1);
+    });
+  });
 }
