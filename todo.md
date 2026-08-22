@@ -24,3 +24,11 @@
 - [ ] تشغيل flutter pub get والتحقق من عدم وجود تعارض مع flutter_localizations
 - [ ] تشغيل flutter analyze و flutter test
 - [ ] دفع التعديلات والوسم v2.0.3 إلى GitHub
+
+## v2.0.5 Tasks - Downgrade dependencies for Flutter 3.22.3 compatibility
+- [ ] تحديث pubspec.yaml (sdk: '>=3.3.0 <3.6.0', intl: 0.19.0, flutter_gemma: 0.1.9 بدون dependency_overrides)
+- [ ] تحديث .github/workflows/build.yml (checkout@v3, setup-java@v3, flutter 3.22.3)
+- [ ] ضبط android/build.gradle (AGP 7.4.2, Kotlin 1.9.0)
+- [ ] ضبط android/gradle/wrapper/gradle-wrapper.properties (Gradle 8.3)
+- [ ] تشغيل flutter clean && flutter pub get && flutter build apk --release
+- [ ] دفع التعديلات برمز v2.0.5: Downgrade deps to work with Flutter 3.22
