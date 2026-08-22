@@ -2,6 +2,7 @@ import 'package:flutter_tts/flutter_tts.dart';
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
+import 'dart:convert';
 import 'database_service.dart';
 
 class AiAgentService {
@@ -76,6 +77,54 @@ class AiAgentService {
     return 0.0;
   }
 
+  // محاكي الذكاء الاصطناعي المحلي لاستخراج JSON وتوليد الرد الصوتي الآمن
+  Map<String, dynamic> parseCommandToJson(String voiceText) {
+    String lower = voiceText.toLowerCase();
+    double amount = parseArabicNumber(voiceText);
+    String type = "مصروف";
+    String name = "عام";
+    int targetTab = 0;
+
+    if (lower.contains("بعت") || lower.contains("مبيعات") || lower.contains("بيع")) {
+      type = "مبيعات";
+      targetTab = 0;
+      if (amount <= 0) amount = 1000000;
+    } else if (lower.contains("اشتريت") || lower.contains("مشتريات") || lower.contains("شريت")) {
+      type = "مشتريات";
+      targetTab = 1;
+      if (amount <= 0) amount = 50000;
+    } else if (lower.contains("دين لي") || (lower.contains("على") && (lower.contains("دين") || lower.contains("سلف")))) {
+      type = "دين_لي";
+      targetTab = 2;
+      if (amount <= 0) amount = 100000;
+    } else if (lower.contains("دين علي") || lower.contains("ديني") || lower.contains("لي دين") || lower.startsWith("علي دين")) {
+      type = "دين_علي";
+      targetTab = 2;
+      if (amount <= 0) amount = 50000;
+    } else {
+      type = "مصروف";
+      targetTab = 0;
+      if (amount <= 0) amount = 20000;
+    }
+
+    // استخراج اسم الطرف إن وجدت
+    if (lower.contains("على ")) {
+      var parts = voiceText.split("على ");
+      if (parts.length > 1) {
+        name = parts[1].split(" ")[0];
+      }
+    } else if (lower.contains("لاحمد") || lower.contains("لأحمد")) {
+      name = "أحمد";
+    }
+
+    return {
+      "النوع": type,
+      "الاسم": name,
+      "المبلغ": amount,
+      "targetTab": targetTab
+    };
+  }
+
   Future<Map<String, dynamic>> processVoiceCommandText(String voiceText, Function(String) onResult) async {
     await init();
     String lower = voiceText.toLowerCase();
@@ -97,96 +146,53 @@ class AiAgentService {
       return {"action": "search", "query": query, "results": results, "reply": msg, "targetTab": 0};
     }
 
-    if (lower.contains("بعت") || lower.contains("مبيعات") || lower.contains("بيع")) {
-      double amount = parseArabicNumber(lower);
-      if (amount <= 0) amount = 1000000;
-      
-      await _db.addTransaction(
-        type: 'مبيعات',
-        amount: amount,
-        description: voiceText,
-      );
+    // تحليل الذكاء المحلي إلى JSON
+    var jsonResult = parseCommandToJson(voiceText);
+    String type = jsonResult["النوع"];
+    double amount = jsonResult["المبلغ"];
+    String name = jsonResult["الاسم"];
+    int targetTab = jsonResult["targetTab"];
 
-      String msg = "تم يا شيخ. سجلت مبيعات بمبلغ ${amount.toStringAsFixed(0)} ريال.";
-      onResult(msg);
-      await speakYemeni(msg);
-      return {"action": "add_sale", "amount": amount, "reply": msg, "targetTab": 0};
+    String dbType = "مصروف";
+    String actionName = "add_expense";
+    String spokenAction = "مصروف";
+
+    if (type == "مبيعات") {
+      dbType = "مبيعات";
+      actionName = "add_sale";
+      spokenAction = "مبيعات";
+    } else if (type == "مشتريات") {
+      dbType = "مشتريات";
+      actionName = "add_purchase";
+      spokenAction = "مشتريات";
+    } else if (type == "دين_لي") {
+      dbType = "دين لك";
+      actionName = "debt_to_me";
+      spokenAction = "دين لك على $name";
+    } else if (type == "دين_علي") {
+      dbType = "دين عليك";
+      actionName = "debt_from_me";
+      spokenAction = "دين عليك";
     }
 
-    if (lower.contains("اشتريت") || lower.contains("مشتريات") || lower.contains("شريت")) {
-      double amount = parseArabicNumber(lower);
-      if (amount <= 0) amount = 50000;
+    // الحفظ الفعلي في قاعدة البيانات SQLite
+    await _db.addTransaction(
+      type: dbType,
+      amount: amount,
+      description: "$voiceText (الطرف: $name)",
+    );
 
-      await _db.addTransaction(
-        type: 'مشتريات',
-        amount: amount,
-        description: voiceText,
-      );
+    String formattedAmount = amount.toStringAsFixed(0);
+    String msg = "تم تسجيل $spokenAction بمبلغ $formattedAmount ريال.";
+    onResult(msg);
+    await speakYemeni(msg);
 
-      String msg = "تم يا شيخ. سجلت مشتريات بمبلغ ${amount.toStringAsFixed(0)} ريال.";
-      onResult(msg);
-      await speakYemeni(msg);
-      return {"action": "add_purchase", "amount": amount, "reply": msg, "targetTab": 1};
-    }
-
-    if (lower.contains("دين لي") || (lower.contains("على") && (lower.contains("دين") || lower.contains("سلف")))) {
-      double amount = parseArabicNumber(lower);
-      if (amount <= 0) amount = 100000;
-
-      await _db.addTransaction(
-        type: 'دين لك',
-        amount: amount,
-        description: voiceText,
-      );
-
-      String msg = "تم يا شيخ. سجلت دين لك بمبلغ ${amount.toStringAsFixed(0)} ريال.";
-      onResult(msg);
-      await speakYemeni(msg);
-      return {"action": "debt_to_me", "amount": amount, "reply": msg, "targetTab": 2};
-    }
-
-    if (lower.contains("دين علي") || lower.contains("ديني") || lower.contains("لي دين") || lower.startsWith("علي دين")) {
-      double amount = parseArabicNumber(lower);
-      if (amount <= 0) amount = 50000;
-
-      await _db.addTransaction(
-        type: 'دين عليك',
-        amount: amount,
-        description: voiceText,
-      );
-
-      String msg = "تم يا شيخ. سجلت دين عليك بمبلغ ${amount.toStringAsFixed(0)} ريال.";
-      onResult(msg);
-      await speakYemeni(msg);
-      return {"action": "debt_from_me", "amount": amount, "reply": msg, "targetTab": 2};
-    }
-
-    if (lower.contains("صرفت") || lower.contains("مصروف") || lower.contains("دفعت") || lower.contains("بنزين")) {
-      double amount = parseArabicNumber(lower);
-      if (amount <= 0) amount = 20000;
-
-      await _db.addTransaction(
-        type: 'مصروف',
-        amount: amount,
-        description: voiceText,
-      );
-
-      String msg = "تم يا شيخ. سجلت مصروف بمبلغ ${amount.toStringAsFixed(0)} ريال.";
-      onResult(msg);
-      await speakYemeni(msg);
-      return {"action": "add_expense", "amount": amount, "reply": msg, "targetTab": 0};
-    }
-
-    if (lower.contains("مخزن") || lower.contains("بضاعة") || lower.contains("مستودع")) {
-      String msg = "أبشر يا شيخ، تم فتح قسم المخزون وعرض العناصر المتوفرة.";
-      onResult(msg);
-      await speakYemeni(msg);
-      return {"action": "inventory", "reply": msg, "targetTab": 3};
-    }
-
-    String defaultReply = "يا هلا بك يا شيخ، أمرك على عيني وراسي. أقدر أسجل مبيعات، مشتريات، ديون، ومصروفات فوراً.";
-    onResult(defaultReply);
-    await speakYemeni(defaultReply);
-    return {"action": "unknown", "reply": defaultReply, "targetTab": 0};
+    return {
+      "action": actionName,
+      "json": jsonResult,
+      "amount": amount,
+      "reply": msg,
+      "targetTab": targetTab
+    };
   }
 }

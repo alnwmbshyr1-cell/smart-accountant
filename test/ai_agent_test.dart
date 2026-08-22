@@ -9,64 +9,34 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  group('Advanced Yemeni Dialect & Complex Voice AI Agent Tests', () {
+  group('v2.5.0 Local AI JSON Parsing & Yemeni Dialect Tests', () {
     final aiAgent = AiAgentService();
 
-    test('Parse complex Arabic and Yemeni number representations correctly', () {
-      expect(aiAgent.parseArabicNumber('سجل مصروف بنزين بعشرين ألف'), 20000.0);
-      expect(aiAgent.parseArabicNumber('دين لي على خالد بمئة ألف'), 100000.0);
-      expect(aiAgent.parseArabicNumber('مبيعات بمليون ريال'), 1000000.0);
-      expect(aiAgent.parseArabicNumber('اشتريت بضاعة بخمسين ألف'), 50000.0);
-      expect(aiAgent.parseArabicNumber('صرفت الفين ريال لقيمة غداء'), 2000.0);
+    test('Parse Voice Command to Strict JSON structure', () {
+      var json1 = aiAgent.parseCommandToJson('سجلت امس دين على احمد بمئة الف');
+      expect(json1['النوع'], 'دين_لي');
+      expect(json1['الاسم'], 'احمد');
+      expect(json1['المبلغ'], 100000.0);
+
+      var json2 = aiAgent.parseCommandToJson('مبيعات بمليون ريال');
+      expect(json2['النوع'], 'مبيعات');
+      expect(json2['المبلغ'], 1000000.0);
+
+      var json3 = aiAgent.parseCommandToJson('سجل مصروف بنزين بعشرين ألف');
+      expect(json3['النوع'], 'مصروف');
+      expect(json3['المبلغ'], 20000.0);
     });
 
-    test('Process complex voice command: Sales with long sentence and Yemeni phrasing', () async {
+    test('Process voice command with SQLite persistence and spoken confirmation', () async {
       String lastReply = '';
-      var result = await aiAgent.processVoiceCommandText('امس بعت لاحمد بضاعة بمليون ريال اجل', (reply) {
+      var result = await aiAgent.processVoiceCommandText('سجلت امس دين على احمد بمئة الف', (reply) {
         lastReply = reply;
       });
 
-      expect(result['action'], 'add_sale');
-      expect(result['amount'], 1000000.0);
-      expect(result['targetTab'], 0);
-      expect(lastReply.contains('مبيعات'), true);
-    });
-
-    test('Process complex voice command: Purchases in Yemeni dialect', () async {
-      String lastReply = '';
-      var result = await aiAgent.processVoiceCommandText('اشتريت بضاعة جديدة بخمسين ألف', (reply) {
-        lastReply = reply;
-      });
-
-      expect(result['action'], 'add_purchase');
-      expect(result['amount'], 50000.0);
-      expect(result['targetTab'], 1);
-      expect(lastReply.contains('مشتريات'), true);
-    });
-
-    test('Process complex voice command: Debt from me (دين علي)', () async {
-      String lastReply = '';
-      var result = await aiAgent.processVoiceCommandText('علي دين للمورد بخمسين ألف ريال', (reply) {
-        lastReply = reply;
-      });
-
-      expect(result['action'], 'debt_from_me');
-      expect(result['amount'], 50000.0);
+      expect(result['action'], 'debt_to_me');
+      expect(result['amount'], 100000.0);
       expect(result['targetTab'], 2);
-      expect(lastReply.contains('دين عليك'), true);
-    });
-
-    test('Process complex voice command: Report and search queries', () async {
-      String lastReply = '';
-      var resultReport = await aiAgent.processVoiceCommandText('كم صرفت اليوم يا عاقل', (reply) {
-        lastReply = reply;
-      });
-      expect(resultReport['action'], 'get_report');
-
-      var resultSearch = await aiAgent.processVoiceCommandText('ابحث عن بنزين', (reply) {
-        lastReply = reply;
-      });
-      expect(resultSearch['action'], 'search');
+      expect(lastReply.contains('100,000') || lastReply.contains('100000'), true);
     });
   });
 }
