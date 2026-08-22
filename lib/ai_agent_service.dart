@@ -17,6 +17,7 @@ class AiAgentService {
 
   Future<void> init() async {
     try {
+      // تجنب Platform Channels في الـ Isolate الخلفي
       await _tts.setLanguage("ar-SA");
       await _tts.setSpeechRate(0.82);
       await _tts.setPitch(0.8);

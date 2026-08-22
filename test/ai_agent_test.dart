@@ -3,14 +3,19 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:smart_accountant/ai_agent_service.dart';
 import 'package:smart_accountant/yemeni_dictionary.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:smart_accountant/database_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   sqfliteFfiInit();
   databaseFactory = databaseFactoryFfi;
 
-  setUp(() {
+  setUp(() async {
     SharedPreferences.setMockInitialValues({});
+    try {
+      final db = await DatabaseService().database;
+      await db.delete('transactions');
+    } catch (_) {}
   });
 
   group('v3.1.0 Indexed SQLite & Yemeni Dialect Tests', () {

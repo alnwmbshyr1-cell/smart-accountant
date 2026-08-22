@@ -129,8 +129,34 @@ class DatabaseService {
   Future<List<Map<String, dynamic>>> getTransactions() async {
     await migrateFromSharedPreferencesIfNeeded();
     final db = await database;
-    final result = await db.query(_tableName, orderBy: 'date DESC', limit: 500); // عرض أحدث 500 للواجهة لضمان السرعة المطلقة
+    final result = await db.query(_tableName, orderBy: 'date DESC, id DESC', limit: 100);
     return result;
+  }
+
+  /// Keyset Pagination العالية الأداء لتصفح الملايين بدون تجاوز الحد أو بطء الـ Offset
+  Future<List<Map<String, dynamic>>> getTransactionsPage({
+    int limit = 100,
+    String? lastDate,
+    String? lastId,
+  }) async {
+    await migrateFromSharedPreferencesIfNeeded();
+    final db = await database;
+
+    if (lastDate != null && lastId != null) {
+      return await db.query(
+        _tableName,
+        where: 'date < ? OR (date = ? AND id < ?)',
+        whereArgs: [lastDate, lastDate, lastId],
+        orderBy: 'date DESC, id DESC',
+        limit: limit,
+      );
+    } else {
+      return await db.query(
+        _tableName,
+        orderBy: 'date DESC, id DESC',
+        limit: limit,
+      );
+    }
   }
 
   Future<double> getTodayTotal(String type) async {
@@ -184,3 +210,5 @@ class DatabaseService {
     return 0.0;
   }
 }
+
+
