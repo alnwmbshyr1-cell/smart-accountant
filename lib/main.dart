@@ -30,6 +30,7 @@ class SmartAccountantApp extends StatelessWidget {
     this.permissionServiceOverride,
     this.printInvoiceOverride,
     this.exportExcelOverride,
+    this.exportServiceOverride,
   });
 
   final bool enableNativeServices;
@@ -40,6 +41,7 @@ class SmartAccountantApp extends StatelessWidget {
       printInvoiceOverride;
   final Future<File> Function(List<Map<String, dynamic>> transactions)?
       exportExcelOverride;
+  final ExportService? exportServiceOverride;
 
   @override
   Widget build(BuildContext context) {
@@ -113,6 +115,7 @@ class SmartAccountantApp extends StatelessWidget {
         permissionServiceOverride: permissionServiceOverride,
         printInvoiceOverride: printInvoiceOverride,
         exportExcelOverride: exportExcelOverride,
+        exportServiceOverride: exportServiceOverride,
       ),
     );
   }
@@ -127,6 +130,7 @@ class MainDashboardScreen extends ConsumerStatefulWidget {
     this.permissionServiceOverride,
     this.printInvoiceOverride,
     this.exportExcelOverride,
+    this.exportServiceOverride,
   });
 
   final bool enableNativeServices;
@@ -137,6 +141,7 @@ class MainDashboardScreen extends ConsumerStatefulWidget {
       printInvoiceOverride;
   final Future<File> Function(List<Map<String, dynamic>> transactions)?
       exportExcelOverride;
+  final ExportService? exportServiceOverride;
 
   @override
   ConsumerState<MainDashboardScreen> createState() =>
@@ -148,6 +153,7 @@ class _MainDashboardScreenState extends ConsumerState<MainDashboardScreen> {
   late final AiAgentService _aiAgent;
   late final DatabaseService _db;
   late final PermissionService _permissions;
+  late final ExportService _exportService;
 
   bool _isListening = false;
   bool _isRecording = false;
@@ -178,6 +184,9 @@ class _MainDashboardScreenState extends ConsumerState<MainDashboardScreen> {
     _db = widget.databaseOverride ?? ref.read(databaseServiceProvider);
     _permissions =
         widget.permissionServiceOverride ?? const PermissionService();
+    _exportService =
+        widget.exportServiceOverride ?? ref.read(exportServiceProvider);
+
     _transactionsController.addListener(_onTransactionsScroll);
     if (widget.enableNativeServices) {
       _prepareVoiceFeatures();
@@ -463,7 +472,7 @@ class _MainDashboardScreenState extends ConsumerState<MainDashboardScreen> {
     if (_isLoading) return;
     setState(() => _isLoading = true);
     try {
-      await (widget.printInvoiceOverride ?? ExportService.printInvoice)(
+      await (widget.printInvoiceOverride ?? _exportService.printInvoice)(
         _transactions,
       );
       if (!mounted) return;
@@ -485,7 +494,7 @@ class _MainDashboardScreenState extends ConsumerState<MainDashboardScreen> {
     setState(() => _isLoading = true);
     try {
       final file =
-          await (widget.exportExcelOverride ?? ExportService.exportToExcel)(
+          await (widget.exportExcelOverride ?? _exportService.exportToExcel)(
         _transactions,
       );
       if (!mounted) return;

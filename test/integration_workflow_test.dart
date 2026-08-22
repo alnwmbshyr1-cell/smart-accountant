@@ -74,7 +74,7 @@ void main() {
     expect(saved.single['type'], 'مصروف');
     expect(saved.single['amount'], 20000);
 
-    final file = await ExportService.exportToExcel(saved);
+    final file = await const ExportService().exportToExcel(saved);
     addTearDown(() async {
       if (await file.exists()) await file.delete();
     });

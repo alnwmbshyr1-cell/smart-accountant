@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:excel/excel.dart';
 import 'package:path_provider/path_provider.dart';
@@ -6,10 +7,48 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
-class ExportService {
-  const ExportService._();
+abstract interface class InvoicePrinter {
+  Future<void> printPdf(List<int> pdfBytes);
+}
 
-  static Future<void> printInvoice(
+class PrintingInvoicePrinter implements InvoicePrinter {
+  const PrintingInvoicePrinter();
+
+  @override
+  Future<void> printPdf(List<int> pdfBytes) {
+    return Printing.layoutPdf(
+      onLayout: (_) async => Uint8List.fromList(pdfBytes),
+    );
+  }
+}
+
+abstract interface class FileWriter {
+  Future<File> write(String fileName, List<int> bytes);
+}
+
+class LocalFileWriter implements FileWriter {
+  const LocalFileWriter();
+
+  @override
+  Future<File> write(String fileName, List<int> bytes) async {
+    final directory = await getApplicationDocumentsDirectory();
+    final file = File('${directory.path}/$fileName');
+    await file.writeAsBytes(bytes, flush: true);
+    return file;
+  }
+}
+
+class ExportService {
+  const ExportService({
+    InvoicePrinter printer = const PrintingInvoicePrinter(),
+    FileWriter fileWriter = const LocalFileWriter(),
+  })  : _printer = printer,
+        _fileWriter = fileWriter;
+
+  final InvoicePrinter _printer;
+  final FileWriter _fileWriter;
+
+  Future<List<int>> buildInvoicePdf(
     List<Map<String, dynamic>> transactions,
   ) async {
     final document = pw.Document();
@@ -21,15 +60,17 @@ class ExportService {
     document.addPage(
       pw.Page(
         pageFormat: PdfPageFormat.a4,
-        build: (context) => pw.Directionality(
+        build: (_) => pw.Directionality(
           textDirection: pw.TextDirection.rtl,
           child: pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.stretch,
             children: [
               pw.Text(
                 'Smart Accountant - فاتورة العمليات',
-                style:
-                    pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold),
+                style: pw.TextStyle(
+                  fontSize: 20,
+                  fontWeight: pw.FontWeight.bold,
+                ),
               ),
               pw.SizedBox(height: 16),
               pw.TableHelper.fromTextArray(
@@ -57,10 +98,21 @@ class ExportService {
       ),
     );
 
-    await Printing.layoutPdf(onLayout: (_) async => document.save());
+    final bytes = await document.save();
+    if (bytes.isEmpty) {
+      throw StateError('تعذر إنشاء مستند PDF فارغ');
+    }
+    return bytes;
   }
 
-  static Future<File> exportToExcel(
+  Future<void> printInvoice(
+    List<Map<String, dynamic>> transactions,
+  ) async {
+    final bytes = await buildInvoicePdf(transactions);
+    await _printer.printPdf(bytes);
+  }
+
+  Future<File> exportToExcel(
     List<Map<String, dynamic>> transactions,
   ) async {
     final workbook = Excel.createExcel();
@@ -82,15 +134,13 @@ class ExportService {
     }
 
     final bytes = workbook.save();
-    if (bytes == null) {
+    if (bytes == null || bytes.isEmpty) {
       throw StateError('تعذر إنشاء ملف Excel');
     }
 
-    final directory = await getApplicationDocumentsDirectory();
-    final file = File(
-      '${directory.path}/smart_accountant_${DateTime.now().millisecondsSinceEpoch}.xlsx',
+    return _fileWriter.write(
+      'smart_accountant_${DateTime.now().millisecondsSinceEpoch}.xlsx',
+      bytes,
     );
-    await file.writeAsBytes(bytes, flush: true);
-    return file;
   }
 }

@@ -305,3 +305,11 @@
 - [x] اختبار ExportService للطباعة الفارغة والبيانات الحدية واستثناءات Printing
 - [x] اختبار ExportService لفشل الكتابة والملف غير القابل للإنشاء
 - [ ] تشغيل coverage والتحقق من تجاوز 80% للخدمات المستهدفة ودفع النتائج؛ Gemini 89.66%، Export 41.30%، الإجمالي 75.42%
+
+
+## ExportService dependency injection refactor
+- [x] فصل بناء PDF عن InvoicePrinter وFileWriter
+- [x] إضافة providers لـExportService عبر Riverpod مع بدائل اختبارية
+- [x] تحديث main.dart لاستخدام ExportService المحقون
+- [x] إضافة اختبارات FakeInvoicePrinter وFakeFileWriter للوحدة والواجهة
+- [x] تشغيل التحليل والاختبارات والتغطية ودفع التغييرات؛ ExportService 91.53%، GeminiService 89.66%، الإجمالي 77.62%

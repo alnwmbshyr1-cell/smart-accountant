@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'ai_agent_service.dart';
 import 'database_service.dart';
 import 'services/gemini_service.dart';
+import 'export_service.dart';
 
 final databaseServiceProvider = Provider<DatabaseService>(
   (ref) => DatabaseService(),
@@ -14,6 +15,10 @@ final geminiServiceProvider = Provider<GeminiService>(
 
 final aiAgentServiceProvider = Provider<AiAgentService>(
   (ref) => AiAgentService(gemini: ref.watch(geminiServiceProvider)),
+);
+
+final exportServiceProvider = Provider<ExportService>(
+  (ref) => const ExportService(),
 );
 
 final selectedReportMonthsProvider = StateProvider<int>((ref) => 6);
