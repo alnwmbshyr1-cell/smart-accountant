@@ -4,12 +4,20 @@ import 'package:smart_accountant/ai_agent_service.dart';
 import 'package:smart_accountant/yemeni_dictionary.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:smart_accountant/database_service.dart';
+import 'package:smart_accountant/services/gemini_service.dart';
+
+class OfflineGeminiService extends GeminiService {
+  OfflineGeminiService() : super();
+
+  @override
+  Future<Map<String, dynamic>?> processCommand(String text) async => null;
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   sqfliteFfiInit();
   databaseFactory = databaseFactoryFfi;
-  final aiAgent = AiAgentService();
+  final aiAgent = AiAgentService(gemini: OfflineGeminiService());
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
@@ -84,5 +92,83 @@ void main() {
   test('Reject command without a positive amount', () {
     final result = aiAgent.parseCommandToJson('سجل مصروف بنزين');
     expect(result['المبلغ'], 0.0);
+  });
+
+  test('Process daily expense report and return the calculated result',
+      () async {
+    final db = DatabaseService();
+    await db.addTransaction(
+      type: 'مصروف',
+      amount: 25000,
+      description: 'بنزين',
+    );
+    String reply = '';
+
+    final result = await aiAgent.processVoiceCommandText(
+      'كم صرفت اليوم',
+      (value) => reply = value,
+    );
+
+    expect(result['action'], 'get_report');
+    expect((result['result'] as num), greaterThanOrEqualTo(25000));
+    expect(reply, contains('صرف'));
+  });
+
+  test('Search command returns matching local transactions', () async {
+    final db = DatabaseService();
+    await db.addTransaction(
+      type: 'مصروف',
+      amount: 18000,
+      description: 'بنزين السيارة',
+    );
+    String reply = '';
+
+    final result = await aiAgent.processVoiceCommandText(
+      'ابحث عن بنزين',
+      (value) => reply = value,
+    );
+
+    expect(result['action'], 'search');
+    expect((result['results'] as List), isNotEmpty);
+    expect(reply, contains('عمليات مطابقة'));
+  });
+
+  test('Process all supported local operation types and select their tabs',
+      () async {
+    final commands = <String, Map<String, dynamic>>{
+      'بعت بضاعة بمئة ألف': {'action': 'add_sale', 'tab': 1},
+      'اشتريت بضاعة بخمسين ألف': {'action': 'add_purchase', 'tab': 1},
+      'دين لي على خالد بعشرة آلاف': {
+        'action': 'add_debt_receivable',
+        'tab': 2,
+      },
+      'علي دين للمورد بعشرين ألف': {
+        'action': 'add_debt_payable',
+        'tab': 2,
+      },
+      'أضف خمسة أصناف للمخزن': {'action': 'add_inventory', 'tab': 3},
+      'سجل مصروف بنزين بثلاثة آلاف': {'action': 'add_expense', 'tab': 0},
+    };
+
+    for (final entry in commands.entries) {
+      final result = await aiAgent.processVoiceCommandText(
+        entry.key,
+        (_) {},
+      );
+      expect(result['action'], entry.value['action'], reason: entry.key);
+      expect(result['targetTab'], entry.value['tab'], reason: entry.key);
+      expect((result['amount'] as num), greaterThan(0), reason: entry.key);
+    }
+  });
+
+  test('Ask for amount when a command has no positive amount', () async {
+    String reply = '';
+    final result = await aiAgent.processVoiceCommandText(
+      'سجل مصروف بنزين',
+      (value) => reply = value,
+    );
+
+    expect(result['action'], 'needs_amount');
+    expect(reply, contains('المبلغ'));
   });
 }

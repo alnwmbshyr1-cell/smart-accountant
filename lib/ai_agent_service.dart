@@ -17,6 +17,7 @@ class AiAgentService {
   final GeminiService _gemini;
 
   bool _isListening = false;
+  bool _isCapturingCommand = false;
   bool _isAssistantMode = false;
   bool _wakeWordEnabled = false;
   bool _commandMode = false;
@@ -216,6 +217,8 @@ class AiAgentService {
 
   /// يسجل من ميكروفون Vosk لمدة ثابتة دون speech_to_text أو شبكة.
   Future<String?> startListening10Seconds() async {
+    if (_isCapturingCommand) return null;
+    _isCapturingCommand = true;
     try {
       await _initVosk();
       _commandText = '';
@@ -237,6 +240,8 @@ class AiAgentService {
     } catch (error) {
       _onWakeStatus?.call('تعذر التسجيل المحلي عبر Vosk: $error');
       return null;
+    } finally {
+      _isCapturingCommand = false;
     }
   }
 
@@ -290,7 +295,8 @@ class AiAgentService {
     if (lower.contains("كم صرفت") ||
         lower.contains("تقرير اليوم") ||
         lower.contains("المصروفات اليومية") ||
-        lower.contains("صرفت اليوم")) {
+        lower.contains("صرفت اليوم") ||
+        lower.contains("كم مصروف اليوم")) {
       double total = await _db.getTodayTotal('مصروف');
       String msg =
           "تم يا شيخ. صرفت اليوم مبلغ وقدره ${total.toStringAsFixed(0)} ريال يمني.";
@@ -401,8 +407,8 @@ class AiAgentService {
   static String _canonicalType(String type) {
     final value = type.trim();
     if (value == 'ايراد' || value == 'إيراد') return 'مبيعات';
-    if (value == 'دين لك') return 'دين_لي';
-    if (value == 'دين عليك') return 'دين_علي';
+    if (value == 'دين لك' || value == 'دين_لي') return 'دين_لي';
+    if (value == 'دين عليك' || value == 'دين_علي') return 'دين_علي';
     if (value == 'مخزون' || value == 'مخزن') return 'مخزون';
     if (value == 'مشتريات') return 'مشتريات';
     if (value == 'مبيعات') return 'مبيعات';
