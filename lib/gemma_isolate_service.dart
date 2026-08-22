@@ -33,7 +33,8 @@ class GemmaIsolateService {
       if (message is GemmaIsolateRequest) {
         try {
           // استدلال محلي بالكامل وإرجاع JSON خفيف الوزن للواجهة بدون أخطاء Platform Channel
-          final jsonResult = AiAgentParser.parseCommandToJson(message.commandText);
+          final jsonResult =
+              AiAgentParser.parseCommandToJson(message.commandText);
           message.replyPort.send(jsonResult);
         } catch (e) {
           message.replyPort.send({
@@ -48,13 +49,15 @@ class GemmaIsolateService {
   }
 
   /// إرسال أمر نصي إلى Isolate الخلفية والحصول على هيكل JSON فوري دون تجميد الـ UI
-  static Future<Map<String, dynamic>> processCommandInIsolate(String text) async {
+  static Future<Map<String, dynamic>> processCommandInIsolate(
+      String text) async {
     if (!_isRunning || _sendPort == null) {
       await initIsolate();
     }
 
     final responsePort = ReceivePort();
-    _sendPort!.send(GemmaIsolateRequest(commandText: text, replyPort: responsePort.sendPort));
+    _sendPort!.send(GemmaIsolateRequest(
+        commandText: text, replyPort: responsePort.sendPort));
 
     final result = await responsePort.first as Map<String, dynamic>;
     responsePort.close();

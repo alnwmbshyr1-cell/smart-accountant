@@ -320,3 +320,11 @@
 - [x] توليد وتخزين تقرير HTML وlcov كـ artifacts
 - [x] فرض حد التغطية قبل خطوة بناء APK
 - [x] التحقق من YAML ودفع workflow المحدث؛ 65 اختباراً ناجحاً و77.62% coverage
+
+
+## CI jobs and Git pre-push integration
+- [x] إنشاء Jobs مستقلة للفحوصات fast وfull وsecurity
+- [x] إضافة بوابة quality تعتمد على نتائج Jobs قبل بناء APK
+- [x] إضافة سكريبت ci_local.sh متعدد الأوضاع إلى المستودع
+- [x] إضافة pre-push hook قابل للتثبيت والتحقق من commits قبل الرفع
+- [x] تشغيل التحقق المحلي ودفع ملفات CI الجديدة؛ fast نجح و65 اختباراً كاملة في آخر coverage

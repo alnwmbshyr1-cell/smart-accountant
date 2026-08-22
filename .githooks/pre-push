@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+ROOT_DIR="$(git rev-parse --show-toplevel)"
+cd "$ROOT_DIR"
+
+REMOTE_NAME="${1:-origin}"
+REMOTE_URL="${2:-}"
+
+if [ "${SKIP_LOCAL_CI:-0}" = "1" ]; then
+  echo "SKIP_LOCAL_CI=1: local CI checks skipped"
+  exit 0
+fi
+
+if [ ! -x tooling/ci_local.sh ]; then
+  echo "tooling/ci_local.sh is missing or not executable" >&2
+  exit 1
+fi
+
+echo "Running full local CI checks before pushing to ${REMOTE_NAME}..."
+./tooling/ci_local.sh full
+
+echo "Pre-push checks passed for ${REMOTE_NAME} (${REMOTE_URL})"
