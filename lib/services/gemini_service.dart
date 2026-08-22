@@ -7,10 +7,15 @@ import 'package:google_generative_ai/google_generative_ai.dart';
 ///
 /// لا تضع مفتاح API داخل الكود أو Git. يُحفظ المفتاح في
 /// flutter_secure_storage ويُقرأ عند الحاجة فقط.
+typedef GeminiTextProvider = Future<String?> Function(String prompt);
+typedef GeminiApiKeyLoader = Future<String?> Function();
+
 class GeminiService {
   GeminiService({
     FlutterSecureStorage? storage,
     this.modelName = 'gemini-1.5-flash',
+    this.textProvider,
+    this.apiKeyLoader,
   }) : _storage = storage ?? const FlutterSecureStorage();
 
   static const String apiKeyStorageKey = 'gemini_api_key';
@@ -18,6 +23,8 @@ class GeminiService {
 
   final FlutterSecureStorage _storage;
   final String modelName;
+  final GeminiTextProvider? textProvider;
+  final GeminiApiKeyLoader? apiKeyLoader;
   String? _cachedApiKey;
 
   Future<String?> readApiKey() async {
@@ -25,7 +32,9 @@ class GeminiService {
       return _cachedApiKey;
     }
     try {
-      final value = await _storage.read(key: apiKeyStorageKey);
+      final value = apiKeyLoader != null
+          ? await apiKeyLoader!()
+          : await _storage.read(key: apiKeyStorageKey);
       final key = value?.trim();
       if (key == null || key.isEmpty) return null;
       _cachedApiKey = key;
@@ -85,9 +94,12 @@ class GeminiService {
 الجملة: $input
 ''';
 
-      final response = await model
-          .generateContent([Content.text(prompt)]).timeout(requestTimeout);
-      final raw = response.text?.trim();
+      final raw = textProvider != null
+          ? (await textProvider!(prompt).timeout(requestTimeout))?.trim()
+          : (await model.generateContent([Content.text(prompt)]).timeout(
+                  requestTimeout))
+              .text
+              ?.trim();
       if (raw == null || raw.isEmpty) return null;
 
       final decoded = _decodeJsonObject(raw);
