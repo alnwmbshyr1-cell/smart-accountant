@@ -14,18 +14,13 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
-
-      - name: Setup Java
-        uses: actions/setup-java@v3
-        with:
-          distribution: 'zulu'
-          java-version: '17'
+        uses: actions/checkout@v4
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.22.3'
+          flutter-version: '3.27.1'
+          channel: 'stable'
 
       - name: Install deps
         run: flutter pub get
@@ -43,11 +38,12 @@ jobs:
           files: |
             build/app/outputs/flutter-apk/app-release.apk
           body: |
-            ## ${{ github.ref_name }} - عاقل المحاسبة الخارق v2.0.5
+            ## ${{ github.ref_name }} - عاقل المحاسبة الخارق v2.0.6
             
             ### الميزات والتحديثات
-            - توافق كامل مع Flutter 3.22.3 وflutter_gemma 0.1.9 وintl 0.19.0.
-            - بناء نظيف ومستقر بدون تعارضات.
+            - ترقية بيئة البناء إلى Flutter 3.27.1 لدعم حزمة flutter_gemma و large_file_handler بالكامل.
+            - تحميل نموذج Gemma محلياً عند التشغيل الأول عبر Dio.
+            - بناء نظيف ومستقر 100%.
             
             ### التحميل
             - قم بتنزيل ملف `app-release.apk` وثبته على هاتفك.

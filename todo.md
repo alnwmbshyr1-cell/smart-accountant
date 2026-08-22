@@ -32,3 +32,10 @@
 - [ ] ضبط android/gradle/wrapper/gradle-wrapper.properties (Gradle 8.3)
 - [ ] تشغيل flutter clean && flutter pub get && flutter build apk --release
 - [ ] دفع التعديلات برمز v2.0.5: Downgrade deps to work with Flutter 3.22
+
+## v2.0.6 Tasks - Upgrade Flutter to 3.27.1 for flutter_gemma compatibility
+- [ ] تحديث الإصدار إلى v2.0.6 في pubspec.yaml
+- [ ] تحديث .github/workflows/build.yml لاستخدام Flutter 3.27.1
+- [ ] تشغيل flutter clean && flutter pub get وبناء محلي ناجح
+- [ ] تشغيل flutter analyze و flutter test
+- [ ] دفع الوسم v2.0.6 ومتابعة نجاح GitHub Actions 100%
