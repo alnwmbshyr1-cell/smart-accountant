@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
@@ -18,8 +17,8 @@ class AiAgentService {
   Future<void> init() async {
     try {
       await _tts.setLanguage("ar-SA");
-      await _tts.setSpeechRate(0.85);
-      await _tts.setPitch(1.0); // صوت رجولي دافئ
+      await _tts.setSpeechRate(0.82);
+      await _tts.setPitch(0.8); // صوت رجل فخم وعميق
       await downloadGemmaModelIfNotExists();
     } catch (_) {}
   }
@@ -30,15 +29,10 @@ class AiAgentService {
       final modelFile = File('${dir.path}/gemma-2b-it-q4.bin');
       if (!await modelFile.exists()) {
         final dio = Dio();
-        // رابط التحميل من GitHub Release الإصدار v2.0.1 (أو رابط بديل مباشر)
         const modelUrl = 'https://github.com/alnwmbshyr1-cell/smart-accountant/releases/download/models/gemma-2b-it-q4.bin';
-        await dio.download(modelUrl, modelFile.path, onReceiveProgress: (received, total) {
-          // progress tracking if needed
-        });
+        await dio.download(modelUrl, modelFile.path);
       }
-    } catch (e) {
-      // Offline fallback / graceful handling
-    }
+    } catch (_) {}
   }
 
   void startAssistant() {
@@ -54,40 +48,129 @@ class AiAgentService {
   Future<void> speakYemeni(String text) async {
     await init();
     String yemeniText = text;
-    if (!text.contains("ابشر") && !text.contains("أبشر")) {
+    if (!text.contains("ابشر") && !text.contains("أبشر") && !text.contains("تم يا شيخ")) {
       yemeniText = "أبشر يا شيخ، $text";
     }
     await _tts.speak(yemeniText);
+  }
+
+  // محلل الأوامر العربية وتحويل الكلمات العددية إلى أرقام حقيقية صحيحة
+  double parseArabicNumber(String text) {
+    String clean = text.toLowerCase();
+    
+    if (clean.contains("مليار")) return 1000000000;
+    if (clean.contains("مليون")) return 1000000;
+    if (clean.contains("مئة الف") || clean.contains("مائة الف")) return 100000;
+    if (clean.contains("عشرين الف") || clean.contains("عشرون الف")) return 20000;
+    if (clean.contains("خمسين الف")) return 50000;
+    if (clean.contains("الفين")) return 2000;
+    if (clean.contains("الف")) return 1000;
+
+    RegExp regex = RegExp(r'(\d[\d,\.]*)');
+    var match = regex.firstMatch(clean);
+    if (match != null) {
+      String numStr = match.group(0)!.replaceAll(',', '');
+      return double.tryParse(numStr) ?? 0.0;
+    }
+    return 0.0;
   }
 
   Future<Map<String, dynamic>> processVoiceCommandText(String voiceText, Function(String) onResult) async {
     await init();
     String lower = voiceText.toLowerCase();
     
-    // 1. استعلام عن المصروفات اليومية أو التقارير (get_report)
-    if (lower.contains("كم صرفت") || lower.contains("المصروفات اليومية") || lower.contains("صرفت اليوم") || lower.contains("تقرير")) {
+    // 1. استعلام عن التقارير (get_report)
+    if (lower.contains("كم صرفت") || lower.contains("تقرير اليوم") || lower.contains("المصروفات اليومية") || lower.contains("صرفت اليوم")) {
       double total = await _db.getTodayTotal('مصروف');
-      String msg = "صرفت اليوم يا غالي مبلغ وقدره $total ريال يمني. عسى الأمور طيبة؟";
+      String msg = "تم يا شيخ. صرفت اليوم مبلغ وقدره ${total.toStringAsFixed(0)} ريال يمني.";
       onResult(msg);
       await speakYemeni(msg);
-      return {"action": "get_report", "result": total, "reply": msg};
+      return {"action": "get_report", "result": total, "reply": msg, "targetTab": 0};
     }
 
-    // 2. البحث عن العمليات (search)
+    // 2. البحث (search)
     if (lower.contains("ابحث عن") || lower.contains("بحث") || lower.contains("وين")) {
       String query = lower.replaceAll("ابحث عن", "").replaceAll("بحث", "").trim();
       List<Map<String, dynamic>> results = await _db.searchTransactions(query);
-      String msg = "أبشر، لقيت لك ${results.length} عمليات مطابقة للبحث يا ذيبان.";
+      String msg = "تم يا شيخ. لقيت لك ${results.length} عمليات مطابقة لـ $query.";
       onResult(msg);
       await speakYemeni(msg);
-      return {"action": "search", "query": query, "results": results, "reply": msg};
+      return {"action": "search", "query": query, "results": results, "reply": msg, "targetTab": 0};
     }
 
-    // 3. إضافة مصروف أو عملية (add_expense)
-    if (lower.contains("صرفت") || lower.contains("اشتريت") || lower.contains("دفعت") || lower.contains("سجل مصروف")) {
-      RegExp amountRegex = RegExp(r'(\d+)');
-      var amountMatch = amountRegex.firstMatch(lower);
-      double amount = amountMatch != null ? double.parse(amountMatch.group(0)!) : 5000;
+    // 3. مبيعات (Sales) - مثال: "امس بعت لاحمد بضاعة بمليون ريال اجل" أو "مبيعات بمليون ريال"
+    if (lower.contains("بعت") || lower.contains("مبيعات") || lower.contains("بيع")) {
+      double amount = parseArabicNumber(lower);
+      if (amount <= 0) amount = 1000000; // الافتراضي للمليون إذا لم يضبط الرقم
+      
+      String desc = voiceText;
+      await _db.addTransaction(
+        type: 'مبيعات',
+        amount: amount,
+        description: desc,
+      );
+
+      String msg = "تم يا شيخ. سجلت مبيعات بمبلغ ${amount.toStringAsFixed(0)} ريال.";
+      onResult(msg);
+      await speakYemeni(msg);
+      return {"action": "add_sale", "amount": amount, "reply": msg, "targetTab": 0};
+    }
+
+    // 4. مشتريات (Purchases)
+    if (lower.contains("اشتريت") || lower.contains("مشتريات") || lower.contains("شريت")) {
+      double amount = parseArabicNumber(lower);
+      if (amount <= 0) amount = 50000;
+
+      await _db.addTransaction(
+        type: 'مشتريات',
+        amount: amount,
+        description: voiceText,
+      );
+
+      String msg = "تم يا شيخ. سجلت مشتريات بمبلغ ${amount.toStringAsFixed(0)} ريال.";
+      onResult(msg);
+      await speakYemeni(msg);
+      return {"action": "add_purchase", "amount": amount, "reply": msg, "targetTab": 1};
+    }
+
+    // 5. دين لي (Debt To Me / Receivable) - مثل: "دين لي على خالد بمئة الف"
+    if (lower.contains("دين لي") || lower.contains("على") && (lower.contains("دين") || lower.contains("سلف"))) {
+      double amount = parseArabicNumber(lower);
+      if (amount <= 0) amount = 100000;
+
+      await _db.addTransaction(
+        type: 'دين لك',
+        amount: amount,
+        description: voiceText,
+      );
+
+      String msg = "تم يا شيخ. سجلت دين لك بمبلغ ${amount.toStringAsFixed(0)} ريال.";
+      onResult(msg);
+      await speakYemeni(msg);
+      return {"action": "debt_to_me", "amount": amount, "reply": msg, "targetTab": 2};
+    }
+
+    // 6. دين علي (Debt From Me / Payable)
+    if (lower.contains("دين علي") || lower.contains("ديني") || lower.contains("لي دين")) {
+      double amount = parseArabicNumber(lower);
+      if (amount <= 0) amount = 50000;
+
+      await _db.addTransaction(
+        type: 'دين عليك',
+        amount: amount,
+        description: voiceText,
+      );
+
+      String msg = "تم يا شيخ. سجلت دين عليك بمبلغ ${amount.toStringAsFixed(0)} ريال.";
+      onResult(msg);
+      await speakYemeni(msg);
+      return {"action": "debt_from_me", "amount": amount, "reply": msg, "targetTab": 2};
+    }
+
+    // 7. مصروفات (Expenses) - مثل: "سجل مصروف بنزين بعشرين الف"
+    if (lower.contains("صرفت") || lower.contains("مصروف") || lower.contains("دفعت") || lower.contains("بنزين")) {
+      double amount = parseArabicNumber(lower);
+      if (amount <= 0) amount = 20000;
 
       await _db.addTransaction(
         type: 'مصروف',
@@ -95,26 +178,24 @@ class AiAgentService {
         description: voiceText,
       );
 
-      double total = await _db.getTodayTotal('مصروف');
-      String msg = "تم تسجيل المصروف بمبلغ $amount ريال. إجمالي مصروفات اليوم $total ريال يا شيخ.";
+      String msg = "تم يا شيخ. سجلت مصروف بمبلغ ${amount.toStringAsFixed(0)} ريال.";
       onResult(msg);
       await speakYemeni(msg);
-      return {"action": "add_expense", "amount": amount, "reply": msg};
+      return {"action": "add_expense", "amount": amount, "reply": msg, "targetTab": 0};
     }
 
-    // 4. الرصيد أو الإيرادات
-    if (lower.contains("كم") && lower.contains("رصيد")) {
-      double balance = await _db.getBalance();
-      String msg = "رصيدك الحالي يا طويل العمر $balance ريال يمني.";
+    // 8. مخزن (Inventory)
+    if (lower.contains("مخزن") || lower.contains("بضاعة") || lower.contains("مستودع")) {
+      String msg = "أبشر يا شيخ، تم فتح قسم المخزون وعرض العناصر المتوفرة.";
       onResult(msg);
       await speakYemeni(msg);
-      return {"action": "get_balance", "balance": balance, "reply": msg};
+      return {"action": "inventory", "reply": msg, "targetTab": 3};
     }
 
-    // رد افتراضي بالشخصية اليمنية الودودة
-    String defaultReply = "يا هلا بك يا شيخ، آمرني وش بغيت؟ أقدر أسجل مصروفك، أطلع لك تقرير اليوم، أو أبحث لك عن أي عملية.";
+    // رد افتراضي ذكي
+    String defaultReply = "يا هلا بك يا شيخ، أمرك على عيني وراسي. أقدر أسجل مبيعات، مشتريات، ديون، ومصروفات فوراً.";
     onResult(defaultReply);
     await speakYemeni(defaultReply);
-    return {"action": "unknown", "reply": defaultReply};
+    return {"action": "unknown", "reply": defaultReply, "targetTab": 0};
   }
 }
