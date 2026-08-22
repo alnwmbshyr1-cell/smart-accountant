@@ -148,6 +148,9 @@ class _MainDashboardScreenState extends ConsumerState<MainDashboardScreen> {
     if (widget.enableNativeServices) {
       _prepareVoiceFeatures();
       _loadData();
+    } else {
+      // وضع الاختبار/سطح المكتب لا يملك خدمات صوت أصلية؛ فعّل الواجهة مباشرة.
+      _isVoiceInitializing = false;
     }
   }
 
