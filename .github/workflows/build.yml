@@ -54,6 +54,30 @@ jobs:
           done
           exit 1
 
+      - name: Run tests with coverage
+        run: flutter test --coverage --concurrency=1
+
+      - name: Enforce minimum coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s coverage/lcov.info
+          total=0
+          hit=0
+          while IFS= read -r line; do
+            case "$line" in
+              LF:*) total=$((total + ${line#LF:})) ;;
+              LH:*) hit=$((hit + ${line#LH:})) ;;
+            esac
+          done < coverage/lcov.info
+          if [ "$total" -eq 0 ]; then
+            echo "Coverage file has no executable lines"
+            exit 1
+          fi
+          coverage=$((100 * hit / total))
+          echo "Coverage: ${coverage}% (threshold: 70%)"
+          test "$coverage" -ge 70
+
       - name: Build APK with Gradle network retry
         shell: bash
         run: |
