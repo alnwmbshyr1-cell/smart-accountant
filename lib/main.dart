@@ -361,7 +361,9 @@ class _MainDashboardScreenState extends ConsumerState<MainDashboardScreen> {
       ]);
       if (!mounted) return;
       setState(() {
-        _inventory = []; // مخزن محلي تجريبي
+        _inventory = _transactions
+            .where((transaction) => transaction['type'] == 'مخزون')
+            .toList();
         _balance = metrics[0];
         _todayExpenses = metrics[1];
         _todaySales = metrics[2];
@@ -835,7 +837,11 @@ class _MainDashboardScreenState extends ConsumerState<MainDashboardScreen> {
 
   Widget _buildDebtsScreen(ColorScheme colorScheme) {
     final debts = _transactions
-        .where((t) => t['type'] == 'دين لك' || t['type'] == 'دين عليك')
+        .where((t) =>
+            t['type'] == 'دين لك' ||
+            t['type'] == 'دين عليك' ||
+            t['type'] == 'دين_لي' ||
+            t['type'] == 'دين_علي')
         .toList();
     return Padding(
       padding: const EdgeInsets.all(16),
