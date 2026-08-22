@@ -59,13 +59,12 @@ dependencies:
   package_info_plus: ^8.0.2
   permission_handler: ^10.4.5
   cupertino_icons: ^1.0.6
-  open_file: ^3.3.2
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.2
-  fake_async: ^1.3.2
+  fake_async: ^1.3.1
   drift_dev: ^2.16.2
   build_runner: ^2.4.8
 
@@ -79,5 +78,8 @@ dependency_overrides:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/fonts/DejaVuSans.ttf
+    - assets/fonts/DejaVuSans-Bold.ttf
   # نموذج Vosk يُحمّل عند أول تشغيل لتقليل حجم APK؛ لا تُضمّن الحمولة الكبيرة داخل التطبيق.
 

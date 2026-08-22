@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:excel/excel.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -51,6 +52,20 @@ class ExportService {
   Future<List<int>> buildInvoicePdf(
     List<Map<String, dynamic>> transactions,
   ) async {
+    final regularFont = pw.Font.ttf(
+      (await rootBundle.load(
+        'assets/fonts/DejaVuSans.ttf',
+      )),
+    );
+    final boldFont = pw.Font.ttf(
+      (await rootBundle.load(
+        'assets/fonts/DejaVuSans-Bold.ttf',
+      )),
+    );
+    final theme = pw.ThemeData.withFont(
+      base: regularFont,
+      bold: boldFont,
+    );
     final document = pw.Document();
     final total = transactions.fold<double>(
       0,
@@ -60,6 +75,7 @@ class ExportService {
     document.addPage(
       pw.Page(
         pageFormat: PdfPageFormat.a4,
+        theme: theme,
         build: (_) => pw.Directionality(
           textDirection: pw.TextDirection.rtl,
           child: pw.Column(
