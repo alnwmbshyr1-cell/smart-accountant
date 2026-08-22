@@ -257,3 +257,13 @@
 - [x] إزالة import غير مستخدم من اختبار ExportService ثم إعادة الفحص
 - [x] عزل path_provider في اختبارات ExportService عبر mock MethodChannel لمنع MissingPluginException
 - [x] إنشاء مجلد documents الوهمي في اختبار ExportService قبل الكتابة
+
+
+## DatabaseService unit coverage
+- [x] تحليل الفروع غير المغطاة في DatabaseService ومخطط الجداول
+- [x] اختبار الإدخال المفرد والدفعي والبيانات الافتراضية والحدّية
+- [x] اختبار البحث وKeyset Pagination والإجماليات والتقارير الشهرية
+- [x] اختبار حذف seed وتحديث المخزون والاستعلامات الفارغة
+- [x] تشغيل التحليل والاختبارات وقياس coverage؛ 32 اختباراً ناجحاً والتغطية 49.79%
+- [x] عزل اختبارات DatabaseService بحذف ملف SQLite التجريبي بين الحالات لمنع تراكم السجلات
+- [x] إزالة import sqflite غير المستخدم من اختبارات DatabaseService ثم إعادة الفحص
