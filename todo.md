@@ -157,3 +157,4 @@
 - [ ] تنفيذ البناء الكامل للإصدار الحالي بعد إصلاح عوائق Gradle والشبكة
 - [ ] التحقق من APK Release وREADME وتسليمهما إن نجح البناء
 - [ ] إصلاح namespace المفقود في vosk_flutter ليتوافق مع AGP 8.11.1
+- [ ] إصلاح استخدام afterEvaluate غير الصالح في إعداد namespace لـ vosk_flutter

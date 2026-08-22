@@ -27,11 +27,10 @@ subprojects {
 
 // vosk_flutter 0.3.x predates AGP 8 namespace enforcement.
 subprojects {
-    afterEvaluate { project ->
+    plugins.withId('com.android.library') {
         if (project.name == 'vosk_flutter') {
-            def androidExtension = project.extensions.findByName('android')
-            if (androidExtension != null && androidExtension.hasProperty('namespace')) {
-                androidExtension.namespace = 'org.vosk.vosk_flutter'
+            project.android {
+                namespace 'org.vosk.vosk_flutter'
             }
         }
     }
