@@ -30,6 +30,36 @@ class DefaultVoskModelLoaderAdapter implements VoskModelLoaderAdapter {
       _loader.loadFromNetwork(modelUrl);
 }
 
+abstract interface class VoskEngine {
+  Future<Model> createModel(String modelPath);
+  Future<Recognizer> createRecognizer({
+    required Model model,
+    required int sampleRate,
+  });
+  Future<SpeechService> initSpeechService(Recognizer recognizer);
+}
+
+class DefaultVoskEngine implements VoskEngine {
+  DefaultVoskEngine({VoskFlutterPlugin? plugin})
+      : _plugin = plugin ?? VoskFlutterPlugin.instance();
+
+  final VoskFlutterPlugin _plugin;
+
+  @override
+  Future<Model> createModel(String modelPath) => _plugin.createModel(modelPath);
+
+  @override
+  Future<Recognizer> createRecognizer({
+    required Model model,
+    required int sampleRate,
+  }) =>
+      _plugin.createRecognizer(model: model, sampleRate: sampleRate);
+
+  @override
+  Future<SpeechService> initSpeechService(Recognizer recognizer) =>
+      _plugin.initSpeechService(recognizer);
+}
+
 /// Lifecycle-safe Vosk wrapper.
 ///
 /// Multiple callers may request init at the same time (startup, wake word,
@@ -38,15 +68,21 @@ class VoskService {
   VoskService({
     VoskFlutterPlugin? plugin,
     VoskModelLoaderAdapter? modelLoader,
+    VoskEngine? engine,
   })  : _providedPlugin = plugin,
-        _providedModelLoader = modelLoader;
+        _providedModelLoader = modelLoader,
+        _providedEngine = engine;
 
   final VoskFlutterPlugin? _providedPlugin;
   final VoskModelLoaderAdapter? _providedModelLoader;
+  final VoskEngine? _providedEngine;
   VoskFlutterPlugin? _vosk;
+  VoskEngine? _engine;
 
   VoskFlutterPlugin get _plugin =>
       _vosk ??= _providedPlugin ?? VoskFlutterPlugin.instance();
+  VoskEngine get _voskEngine =>
+      _engine ??= _providedEngine ?? DefaultVoskEngine(plugin: _plugin);
   VoskModelLoaderAdapter? _modelLoader;
 
   bool _isInitialized = false;
@@ -94,12 +130,12 @@ class VoskService {
         : await loader.loadFromNetwork(modelUrl);
 
     if (_isDisposed) return;
-    final model = await _plugin.createModel(modelPath);
+    final model = await _voskEngine.createModel(modelPath);
     if (_isDisposed) {
       model.dispose();
       return;
     }
-    final recognizer = await _plugin.createRecognizer(
+    final recognizer = await _voskEngine.createRecognizer(
       model: model,
       sampleRate: 16000,
     );
@@ -119,7 +155,7 @@ class VoskService {
     if (_isDisposed || _recognizer == null) {
       throw StateError('Vosk recognizer is not available');
     }
-    return _speechService ??= await _plugin.initSpeechService(_recognizer!);
+    return _speechService ??= await _voskEngine.initSpeechService(_recognizer!);
   }
 
   Future<void> stop() async {

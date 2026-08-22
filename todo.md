@@ -336,3 +336,11 @@
 - [x] إضافة اختبارات GeminiService للتخزين المؤقت والمهلات والتطبيع والاستثناءات
 - [x] تشغيل quick_validate والتحليل والاختبارات وcoverage؛ Gemini 90.80%، الإجمالي 77.72%
 - [x] دفع الاختبارات وتسليم SKILL.md للمستخدم؛ commit 50ee413
+
+
+## VoskEngine abstraction and fake_async timers
+- [x] فحص العقود الحالية لـVoskService وAiAgentService والتوافق مع الاختبارات
+- [x] تنفيذ واجهة VoskEngine وتنفيذ Vosk الحقيقي مع إدارة lifecycle آمنة
+- [x] إضافة FakeVoskEngine قابل للتحكم في init/start/stop/failure
+- [x] إضافة fake_async لاختبار Timer وحالات التسجيل والمهلات
+- [x] تشغيل التحليل والاختبارات والتغطية ودفع التغييرات؛ 72 اختباراً ناجحاً، VoskService 64.86%، الإجمالي 77.99%

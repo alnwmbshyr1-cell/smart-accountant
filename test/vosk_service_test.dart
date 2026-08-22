@@ -1,5 +1,17 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:smart_accountant/services/vosk_service.dart';
+import 'fakes/fake_vosk_engine.dart';
+
+class ReadyModelLoader implements VoskModelLoaderAdapter {
+  @override
+  Future<bool> isModelAlreadyLoaded(String modelName) async => true;
+
+  @override
+  Future<String> modelPath(String modelName) async => '/tmp/$modelName';
+
+  @override
+  Future<String> loadFromNetwork(String modelUrl) async => '/tmp/model';
+}
 
 class FailingModelLoader implements VoskModelLoaderAdapter {
   int loadChecks = 0;
@@ -19,6 +31,54 @@ class FailingModelLoader implements VoskModelLoaderAdapter {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test('uses injectable VoskEngine and initializes it once', () async {
+    final engine = FakeVoskEngine();
+    final service = VoskService(
+      engine: engine,
+      modelLoader: FailingModelLoader(),
+    );
+
+    // Override the failing loader with a deterministic loader for this case.
+    final readyService = VoskService(
+      engine: engine,
+      modelLoader: ReadyModelLoader(),
+    );
+    await readyService.init();
+    await readyService.init();
+
+    expect(readyService.isReady, isTrue);
+    expect(engine.createModelCalls, 1);
+    expect(engine.createRecognizerCalls, 1);
+    expect(service.isInitialized, isFalse);
+  });
+
+  test('surfaces model creation failure and resets initializing state',
+      () async {
+    final engine = FakeVoskEngine()..modelFailure = StateError('model failed');
+    final service = VoskService(
+      engine: engine,
+      modelLoader: ReadyModelLoader(),
+    );
+
+    await expectLater(service.init(), throwsA(isA<StateError>()));
+    expect(service.isInitialized, isFalse);
+    expect(service.isInitializing, isFalse);
+  });
+
+  test('surfaces recognizer creation failure without marking ready', () async {
+    final engine = FakeVoskEngine()
+      ..recognizerFailure = StateError('recognizer failed');
+    final service = VoskService(
+      engine: engine,
+      modelLoader: ReadyModelLoader(),
+    );
+
+    await expectLater(service.init(), throwsA(isA<StateError>()));
+    expect(service.isReady, isFalse);
+    expect(engine.createModelCalls, 1);
+    expect(engine.createRecognizerCalls, 1);
+  });
 
   test('init is idempotent and concurrent callers share one failure', () async {
     final loader = FailingModelLoader();
