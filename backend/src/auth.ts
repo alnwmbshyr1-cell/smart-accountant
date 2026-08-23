@@ -9,6 +9,8 @@ export type AuthenticatedUser = {
   claims: Record<string, unknown>;
 };
 
+export type JwtVerifier = (token: string) => Promise<AuthenticatedUser>;
+
 declare global {
   namespace Express {
     interface Request {
@@ -39,14 +41,18 @@ function firebaseVerifier() {
   return getAuth();
 }
 
-function supabaseVerifier() {
-  const projectUrl = process.env.SUPABASE_PROJECT_URL?.replace(/\/$/, '');
+export function createSupabaseVerifier(options?: {
+  projectUrl?: string;
+  audience?: string;
+  jwks?: ReturnType<typeof createRemoteJWKSet>;
+}): JwtVerifier {
+  const projectUrl = (options?.projectUrl ?? process.env.SUPABASE_PROJECT_URL)?.replace(/\/$/, '');
   if (!projectUrl) throw new Error('SUPABASE_PROJECT_URL is required');
   const issuer = `${projectUrl}/auth/v1`;
-  const jwks = createRemoteJWKSet(
+  const jwks = options?.jwks ?? createRemoteJWKSet(
     new URL(`${issuer}/.well-known/jwks.json`),
   );
-  const audience = process.env.SUPABASE_JWT_AUDIENCE ?? 'authenticated';
+  const audience = options?.audience ?? process.env.SUPABASE_JWT_AUDIENCE ?? 'authenticated';
   return async (token: string): Promise<AuthenticatedUser> => {
     const verified = await jwtVerify(token, jwks, {
       issuer,
@@ -68,25 +74,27 @@ function supabaseVerifier() {
   };
 }
 
-export function createJwtVerifier() {
+export function createFirebaseVerifier(
+  auth: Pick<ReturnType<typeof firebaseVerifier>, 'verifyIdToken'> = firebaseVerifier(),
+): JwtVerifier {
+  return async (token: string): Promise<AuthenticatedUser> => {
+    const decoded = await auth.verifyIdToken(token, true);
+    return {
+    uid: decoded.uid,
+    provider: 'firebase',
+    claims: decoded as unknown as Record<string, unknown>,
+  };
+  };
+}
+
+export function createJwtVerifier(): JwtVerifier {
   const provider = process.env.AUTH_PROVIDER ?? 'supabase';
-  if (provider === 'firebase') {
-    return async (token: string): Promise<AuthenticatedUser> => {
-      const decoded = await firebaseVerifier().verifyIdToken(token, true);
-      return {
-        uid: decoded.uid,
-        provider: 'firebase',
-        claims: decoded as unknown as Record<string, unknown>,
-      };
-    };
-  }
-  if (provider === 'supabase') return supabaseVerifier();
+  if (provider === 'firebase') return createFirebaseVerifier();
+  if (provider === 'supabase') return createSupabaseVerifier();
   throw new Error('AUTH_PROVIDER must be firebase or supabase');
 }
 
-export function requireJwt(
-  verify: ReturnType<typeof createJwtVerifier>,
-) {
+export function requireJwt(verify: JwtVerifier) {
   return async (req: Request, res: Response, next: NextFunction) => {
     const token = bearerToken(req);
     if (!token) return res.status(401).json({ error: 'missing_or_malformed_token' });
