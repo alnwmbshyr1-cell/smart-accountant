@@ -1,0 +1,38 @@
+name: Redis Idempotency Integration
+
+on:
+  push:
+    branches: [smart-accountant-v3-final, main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  redis-idempotency:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    services:
+      redis:
+        image: redis:7.4-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install pinned Redis client
+        run: python -m pip install --disable-pip-version-check 'redis==6.4.0'
+      - name: Run isolated Redis integration test
+        env:
+          REDIS_URL: redis://127.0.0.1:6379/15
+          TEST_ID: ci-${{ github.run_id }}
+        run: python tooling/redis_idempotency_integration.py

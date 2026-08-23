@@ -657,3 +657,10 @@
 - [x] ربط Alertmanager بمسار Slack آمن مع deduplication وrecovery
 - [x] توثيق ضوابط Webhook وتوقيع الطلبات وRedis Idempotency ضد Replay
 - [x] إضافة اختبارات الحماية والتحقق وتحديث المهارة ثم الدفع
+
+
+## Redis Lock and Idempotency Integration CI
+- [x] إضافة اختبار تكامل متزامن لنفس Idempotency-Key مع Redis
+- [x] التحقق من رفض body مختلف وإعادة المحاولة بعد انتهاء القفل
+- [x] دمج الاختبار في GitHub Actions مع Redis service وartifacts منقحة
+- [x] تحديث المهارة والتوثيق والتحقق والدفع
