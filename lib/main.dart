@@ -4,6 +4,8 @@ import 'package:intl/intl.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 import 'notification_service.dart';
+import 'auth_screen.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 const orange = Color(0xFFD97706);
 const green = Color(0xFF16A34A);
@@ -13,6 +15,9 @@ const cream = Color(0xFFFFFBF5);
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await MaqaniNotificationService.instance.initialize();
+  if (AuthConfig.isConfigured) {
+    await Supabase.initialize(url: AuthConfig.url, publishableKey: AuthConfig.publishableKey);
+  }
   final db = LivestockDb();
   await db.open();
   runApp(LivestockApp(db: db));
@@ -50,8 +55,27 @@ class LivestockApp extends StatelessWidget {
           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
         ),
       ),
-      home: SplashScreen(db: db),
+      home: AuthGate(db: db),
     );
+  }
+}
+
+class AuthConfig {
+  static const url = String.fromEnvironment('SUPABASE_URL');
+  static const publishableKey = String.fromEnvironment('SUPABASE_PUBLISHABLE_KEY');
+  static bool get isConfigured => url.isNotEmpty && publishableKey.isNotEmpty;
+}
+
+class AuthGate extends StatelessWidget {
+  const AuthGate({super.key, required this.db});
+  final LivestockDb db;
+  @override Widget build(BuildContext context) {
+    if (!AuthConfig.isConfigured) return SplashScreen(db: db);
+    final client = Supabase.instance.client;
+    return StreamBuilder<AuthState>(stream: client.auth.onAuthStateChange, builder: (context, snapshot) {
+      final session = snapshot.data?.session ?? client.auth.currentSession;
+      return session == null ? const AuthScreen() : SplashScreen(db: db);
+    });
   }
 }
 
@@ -105,7 +129,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> load() async { final rows = await widget.db.animals(); if (mounted) setState(() => animals = rows); }
   List<Map<String, dynamic>> get shown => animals.where((a) { final matchesQuery = query.isEmpty || '${a['number']}'.contains(query) || '${a['animal_type']}'.contains(query); final matchesFilter = filter == 'الكل' || (filter == 'الذكور' && a['gender'] == 'ذكر') || (filter == 'الاناث' && a['gender'] == 'انثى') || a['animal_type'] == filter || (filter == 'الدافع' && a['tag_color'] == 'أخضر'); return matchesQuery && matchesFilter; }).toList();
   @override Widget build(BuildContext context) => SafeArea(child: RefreshIndicator(onRefresh: load, child: ListView(padding: const EdgeInsets.fromLTRB(18, 18, 18, 30), children: [
-    Row(children: [const AnimalLogo(size: 46), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('اهلا بك', style: TextStyle(color: Colors.grey.shade600)), const Text('السارحات بارك', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: ink))])), IconButton(onPressed: () {}, icon: const Icon(Icons.notifications_none, color: orange))]),
+    Row(children: [const AnimalLogo(size: 46), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('اهلا بك', style: TextStyle(color: Colors.grey.shade600)), const Text('السارحات بارك', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: ink))])), IconButton(onPressed: AuthConfig.isConfigured ? () async { await Supabase.instance.client.auth.signOut(); } : null, tooltip: 'تسجيل الخروج', icon: const Icon(Icons.logout, color: orange))]),
     const SizedBox(height: 20), Container(padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: orange.withOpacity(.10), borderRadius: BorderRadius.circular(16), border: Border.all(color: orange.withOpacity(.22))), child: const Row(children: [Icon(Icons.info_outline, color: orange), SizedBox(width: 10), Expanded(child: Text('يرجي اضافة ايصال التحويل ليتم تفعيل الحساب', style: TextStyle(color: ink, fontWeight: FontWeight.w600)))])),
     const SizedBox(height: 18), const Text('التصنيف', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900)), const SizedBox(height: 10), StatsCard(animals: animals),
     const SizedBox(height: 14), SizedBox(height: 52, child: FilledButton.icon(onPressed: widget.onAdd, style: FilledButton.styleFrom(backgroundColor: green, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))), icon: const Icon(Icons.add), label: const Text('اضافة رأس', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)))),

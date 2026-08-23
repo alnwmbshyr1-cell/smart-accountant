@@ -80,6 +80,22 @@ await sync.sync(localTables: {
 
 لبيئة مزرعة داخلية بلا إنترنت خارجي، يمكن تشغيل REST API داخل الشبكة المحلية على جهاز دائم التشغيل، مع إبقاء SQLite هو المصدر المحلي الأساسي. للمزامنة عبر الإنترنت بين أجهزة متعددة، يُفضّل Supabase أو خادم HTTPS موثوق مع نسخ احتياطي.
 
+## مصادقة المستخدمين عبر Supabase
+
+أُضيفت شاشة `lib/auth_screen.dart` وبوابة `AuthGate` في `lib/main.dart`. عند تزويد التطبيق بعنوان المشروع ومفتاح publishable، سيظهر تسجيل الدخول تلقائياً، وتُحفظ الجلسة محلياً بواسطة Supabase، ويؤدي زر تسجيل الخروج إلى إنهاء الجلسة والعودة إلى شاشة الدخول. عند عدم تزويد القيم، يستمر التطبيق في وضع SQLite المحلي للتجربة.
+
+فعّل **Email provider** من Supabase Dashboard، ثم شغّل التطبيق بقيم البناء التالية:
+
+```bash
+flutter run \
+  --dart-define=SUPABASE_URL=https://your-project.supabase.co \
+  --dart-define=SUPABASE_PUBLISHABLE_KEY=your-publishable-key
+```
+
+للتسجيل يستخدم التطبيق `signUp`، وللدخول يستخدم `signInWithPassword`. إذا كان تأكيد البريد مفعلاً، سيُطلب من المستخدم فتح رسالة التأكيد قبل إنشاء جلسة دخول. راقب تغييرات الجلسة عبر `onAuthStateChange`؛ هذا هو التدفق الموصى به في عميل Supabase Flutter، مع استخدام `currentSession` عند بدء التطبيق [3].
+
+شغّل Migration `supabase/migrations/202608230002_auth_profiles.sql` لإنشاء جدول `profiles` وربطه بـ `auth.users`. يجب أن تكون كل جداول التطبيق التي تحتوي بيانات مزرعة مرتبطة بعمود `owner_id uuid references auth.users(id)` وأن تحتوي على سياسات RLS تستخدم `auth.uid()`. لا تضع `service_role_key` داخل التطبيق؛ المفتاح الموجود في APK يجب أن يكون publishable/anon فقط، بينما الحماية الفعلية تُفرض في PostgreSQL عبر RLS [4].
+
 ## التشغيل
 
 بعد تثبيت Flutter وAndroid SDK، نفّذ:
@@ -101,3 +117,5 @@ flutter build apk --debug
 
 [1]: https://pub.dev/packages/flutter_local_notifications "flutter_local_notifications — Pub.dev"
 [2]: https://supabase.com/docs/guides/database/postgres/row-level-security "Supabase Row Level Security"
+[3]: https://supabase.com/docs/reference/dart/auth-onauthstatechange "Supabase Dart onAuthStateChange"
+[4]: https://supabase.com/docs/guides/getting-started/quickstarts/flutter "Supabase Flutter Quickstart"
