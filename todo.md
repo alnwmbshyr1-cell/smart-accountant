@@ -579,3 +579,10 @@
 - [x] إضافة متغير Endpoint واستعلامات p95 وp99 حسب route
 - [x] إضافة اختبارات صحة PromQL وتحقق أسماء histogram labels
 - [x] تحديث المهارة وتوثيق cardinality ثم التحقق والدفع
+
+
+## P99 Latency Alert
+- [x] إضافة قاعدة تنبيه p99 أعلى من 500ms لمدة 5 دقائق حسب route
+- [x] ربط alert بـAlertmanager receiver مع labels وannotations آمنة
+- [x] إضافة اختبار promtool لحالة firing وinactive
+- [x] تحديث المهارة والتحقق ثم دفع التعديل

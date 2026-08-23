@@ -49,6 +49,22 @@ groups:
           description: Backend p95 request latency exceeds 2 seconds for 10 minutes.
           runbook: https://runbooks.example.com/smart-accountant/latency
 
+      - alert: SmartAccountantHighP99Latency
+        expr: |
+          histogram_quantile(0.99,
+            sum by (route, le) (
+              rate(smart_accountant_http_request_duration_seconds_bucket{job="smart-accountant-backend"}[5m])
+            )
+          ) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: P99 latency is above 500ms for {{ $labels.route }}
+          description: Endpoint {{ $labels.route }} has p99 request latency above 500ms continuously for 5 minutes.
+          runbook: https://runbooks.example.com/smart-accountant/latency-p99
+
       - alert: SmartAccountantAuthFailureSpike
         expr: rate(smart_accountant_auth_failures_total{job="smart-accountant-backend"}[5m]) > 1
         for: 5m
