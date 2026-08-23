@@ -39,10 +39,21 @@ jobs:
         run: flutter pub get
 
       - name: Check formatting
-        run: dart format --output=none --set-exit-if-changed lib/notification_service.dart
+        run: dart format --output=none --set-exit-if-changed lib/notification_service.dart lib/sync_service.dart test/sync_service_test.dart integration_test/rls_supabase_test.dart
 
       - name: Analyze Dart code
         run: flutter analyze
+
+      - name: Run sync unit tests
+        run: flutter test --coverage --concurrency=1 test/sync_service_test.dart
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: maqani-coverage-${{ github.sha }}
+          if-no-files-found: error
+          retention-days: 14
+          path: coverage/lcov.info
 
       - name: Build release APKs
         run: flutter build apk --release --split-per-abi

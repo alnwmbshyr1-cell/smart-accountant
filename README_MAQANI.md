@@ -159,6 +159,29 @@ await Supabase.instance.client.from('animals').insert({
 
 اختبر الحماية بحسابين مختلفين: يجب أن يرى الحساب الأول سجلاته فقط، وأن يفشل إدخال صف يحمل `owner_id` للحساب الثاني، وأن يعيد تحديث أو حذف سجل الحساب الثاني صفراً أو خطأ صلاحيات. كما يجب اختبار الطلبات دون جلسة، وانتهاء الجلسة، ومحاولة تغيير `owner_id`، ومحاولة الوصول المباشر عبر Data API. توصي Supabase بتفعيل RLS على كل جدول مكشوف وكتابة سياسات لكل عملية [10].
 
+## الاختبارات التلقائية
+
+توجد اختبارات وحدة في `test/sync_service_test.dart` تستخدم HTTP client وهمياً للتحقق من أن المزامنة تضيف `owner_id`، وتستخدم `on_conflict=owner_id,local_id`، وتتعامل مع أخطاء الخادم دون اعتبار السجلات متزامنة. شغّلها محلياً عبر:
+
+```bash
+flutter test --coverage --concurrency=1 test/sync_service_test.dart
+```
+
+يوجد أيضاً اختبار تكامل اختياري في `integration_test/rls_supabase_test.dart` للتحقق من عزل RLS بين حسابين. لا يُشغّل افتراضياً؛ يجب استخدام مشروع staging وحسابين تجريبيين فقط:
+
+```bash
+flutter test integration_test/rls_supabase_test.dart \
+  --dart-define=RUN_RLS_TESTS=true \
+  --dart-define=RLS_SUPABASE_URL=https://staging-project.supabase.co \
+  --dart-define=RLS_SUPABASE_PUBLISHABLE_KEY=your-publishable-key \
+  --dart-define=RLS_TEST_EMAIL_A=test-a@example.com \
+  --dart-define=RLS_TEST_PASSWORD_A=change-me-a \
+  --dart-define=RLS_TEST_EMAIL_B=test-b@example.com \
+  --dart-define=RLS_TEST_PASSWORD_B=change-me-b
+```
+
+اختبار RLS ينشئ سجلاً مؤقتاً بحساب A، ويتحقق من أن الحساب B لا يراه ولا يعدله، ثم يحذفه بحساب A. لا تستخدم حسابات الإنتاج أو مفاتيح service role في الاختبارات. يضم Workflow في `.github/workflows/android-apk.yml` فحص التنسيق والتحليل واختبار المزامنة ورفع ملف `lcov.info` قبل بناء APK.
+
 ## التشغيل
 
 بعد تثبيت Flutter وAndroid SDK، نفّذ:
