@@ -20,6 +20,10 @@ route:
       receiver: smart-accountant-slack
       continue: false
     - matchers:
+        - category="load_test"
+      receiver: smart-accountant-slack
+      continue: false
+    - matchers:
         - severity="critical"
       receiver: smart-accountant-critical
       continue: true

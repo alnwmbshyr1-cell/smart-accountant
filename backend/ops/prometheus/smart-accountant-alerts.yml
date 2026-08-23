@@ -108,6 +108,24 @@ groups:
           description: A protected staging payment test failed in the last 15 minutes; inspect the exact GitHub Actions run before promotion.
           runbook: https://runbooks.example.com/smart-accountant/staging-payment-test
 
+      - alert: SmartAccountantK6P95LatencyHigh
+        expr: |
+          histogram_quantile(0.95,
+            sum by (testid, le) (
+              rate(k6_http_req_duration_seconds_bucket{testid!=""}[2m])
+            )
+          ) > 0.75
+          and on (testid)
+          sum by (testid) (rate(k6_http_reqs_total{testid!=""}[2m])) > 0
+        for: 1m
+        labels:
+          severity: warning
+          category: load_test
+        annotations:
+          summary: k6 p95 latency is above 750ms for {{ $labels.testid }}
+          description: The active k6 run {{ $labels.testid }} has sustained p95 latency above 750ms for at least 1 minute.
+          runbook: https://runbooks.example.com/smart-accountant/k6-p95
+
       - alert: SmartAccountantHighMemory
         expr: smart_accountant_process_rss_bytes{job="smart-accountant-backend"} > 536870912
         for: 10m

@@ -671,3 +671,10 @@
 - [x] إضافة smoke وmedium profiles مع thresholds وartifacts
 - [x] إضافة حواجز staging ومنع production وإشعار فشل منقح
 - [x] تحديث المهارة والتوثيق والتحقق والدفع
+
+
+## Live Grafana p95 Alert During k6
+- [x] إضافة قاعدة p95 لكل testid عند تجاوز 750ms
+- [x] ربط Alertmanager بتنبيه Slack مع deduplication وresolved notifications
+- [x] إضافة تشغيل k6 عبر remote write وملخص فشل فوري في GitHub Actions
+- [x] إضافة اختبارات المراقبة وتحديث المهارة والتحقق والدفع
