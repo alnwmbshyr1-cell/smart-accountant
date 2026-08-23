@@ -181,6 +181,10 @@ class NotifySecurityTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             security_gateway.validate_payload(payload, "sa-" + "d" * 32)
 
+    def test_partial_gateway_mtls_configuration_is_rejected(self):
+        with self.assertRaises(ValueError):
+            notify_security.gateway_ssl_context({"SECURITY_GATEWAY_CA_FILE": "/tmp/ca.pem"})
+
     def test_webhook_sends_idempotency_header_and_payload_field(self):
         captured = {}
         with patch.object(notify_security, "post_json", side_effect=lambda url, payload, **kwargs: captured.update({"payload": payload, "headers": kwargs.get("headers")})):

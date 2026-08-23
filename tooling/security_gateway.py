@@ -169,13 +169,39 @@ def create_server(host: str, port: int, redis: RedisLike, env: Mapping[str, str]
     return ThreadingHTTPServer((host, port), handler)
 
 
+def redis_client(redis_module: Any, env: Mapping[str, str]) -> Any:
+    url = env.get("REDIS_URL", "redis://127.0.0.1:6379/0")
+    use_tls = url.startswith("rediss://") or env.get("REDIS_TLS", "false").lower() == "true"
+    cert_file = env.get("REDIS_CLIENT_CERT_FILE", "")
+    key_file = env.get("REDIS_CLIENT_KEY_FILE", "")
+    ca_file = env.get("REDIS_CA_FILE", "")
+    if use_tls and (not ca_file or not os.path.isfile(ca_file)):
+        raise SystemExit("REDIS_CA_FILE is required and must exist when Redis TLS is enabled")
+    if bool(cert_file) != bool(key_file):
+        raise SystemExit("REDIS_CLIENT_CERT_FILE and REDIS_CLIENT_KEY_FILE must be supplied together")
+    options: dict[str, Any] = {"decode_responses": True}
+    if use_tls:
+        options.update({
+            "ssl": True,
+            "ssl_ca_certs": ca_file,
+            "ssl_check_hostname": env.get("REDIS_SSL_CHECK_HOSTNAME", "true").lower() == "true",
+        })
+        if cert_file and key_file:
+            options.update({"ssl_certfile": cert_file, "ssl_keyfile": key_file})
+    if env.get("REDIS_USERNAME"):
+        options["username"] = env["REDIS_USERNAME"]
+    if env.get("REDIS_PASSWORD"):
+        options["password"] = env["REDIS_PASSWORD"]
+    return redis_module.Redis.from_url(url, **options)
+
+
 def main() -> int:
     try:
         import redis  # type: ignore
     except ImportError as exc:
         raise SystemExit("Install requirements-gateway.txt before starting the gateway") from exc
     env = os.environ
-    client = redis.Redis.from_url(env.get("REDIS_URL", "redis://127.0.0.1:6379/0"), decode_responses=True)
+    client = redis_client(redis, env)
     client.ping()
     server = create_server(env.get("GATEWAY_HOST", "0.0.0.0"), int(env.get("GATEWAY_PORT", "8443")), client, env)
     cert = env.get("TLS_CERT_FILE")
@@ -183,7 +209,14 @@ def main() -> int:
     if not cert or not key:
         raise SystemExit("TLS_CERT_FILE and TLS_KEY_FILE are required")
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
     context.load_cert_chain(certfile=cert, keyfile=key)
+    if env.get("TLS_REQUIRE_CLIENT_CERT", "false").lower() == "true":
+        client_ca = env.get("TLS_CLIENT_CA_FILE")
+        if not client_ca or not os.path.isfile(client_ca):
+            raise SystemExit("TLS_CLIENT_CA_FILE is required when TLS_REQUIRE_CLIENT_CERT=true")
+        context.verify_mode = ssl.CERT_REQUIRED
+        context.load_verify_locations(cafile=client_ca)
     server.socket = context.wrap_socket(server.socket, server_side=True)
     print("security gateway listening", flush=True)
     server.serve_forever()

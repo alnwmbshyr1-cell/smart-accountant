@@ -498,3 +498,10 @@
 - [x] إضافة تحقق من Idempotency-Key وحماية endpoint وforwarding اختياري
 - [x] إضافة اختبارات مفتاح ثابت ومختلف ومنع المكرر في test_notify_security.py
 - [x] إضافة Compose وHTTPS local certificate instructions وتحديث المهارة (فحص Compose يتطلب Docker Compose غير المتاح في الساندبوكس)
+
+
+## Security Gateway Production TLS Integration
+- [x] إضافة إعدادات Redis TLS وشهادات mTLS إلى Security Gateway عبر متغيرات بيئة أو ملفات أسرار
+- [x] ربط security-notify في GitHub Actions بـSecurity Gateway عبر HTTPS وIdempotency-Key
+- [x] توثيق أسرار الشهادات وإجراءات الدوران وعدم تخزينها في Git أو artifacts
+- [x] إضافة اختبارات الإعدادات والتوثيق والتحقق ثم دفع التعديل

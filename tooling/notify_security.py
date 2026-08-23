@@ -6,6 +6,7 @@ import argparse
 import hashlib
 import json
 import os
+import ssl
 import sys
 import time
 import urllib.error
@@ -112,6 +113,7 @@ def post_json(
     headers: dict[str, str] | None = None,
     attempts: int = MAX_ATTEMPTS,
     sleep_fn: Callable[[float], None] = time.sleep,
+    ssl_context: ssl.SSLContext | None = None,
 ) -> None:
     request_headers = {"Content-Type": "application/json", "User-Agent": "smart-accountant-security-notifier/1"}
     request_headers.update(headers or {})
@@ -120,7 +122,10 @@ def post_json(
     for attempt in range(1, max(1, attempts) + 1):
         request = urllib.request.Request(url, data=body, headers=request_headers, method="POST")
         try:
-            with urllib.request.urlopen(request, timeout=timeout) as response:
+            open_args: dict[str, Any] = {"timeout": timeout}
+            if ssl_context is not None:
+                open_args["context"] = ssl_context
+            with urllib.request.urlopen(request, **open_args) as response:
                 if 200 <= response.status < 300:
                     return
                 error = RuntimeError(f"notification endpoint returned HTTP {response.status}")
@@ -158,15 +163,24 @@ def send_slack(webhook_url: str, summary: dict[str, Any]) -> None:
     )
 
 
-def send_webhook(webhook_url: str, summary: dict[str, Any]) -> None:
+def send_webhook(
+    webhook_url: str,
+    summary: dict[str, Any],
+    ssl_context: ssl.SSLContext | None = None,
+    ingress_token: str = "",
+) -> None:
+    headers = {"Idempotency-Key": summary["idempotency_key"]}
+    if ingress_token:
+        headers["Authorization"] = f"Bearer {ingress_token}"
     post_json(
         webhook_url,
         {"event": "critical_security_findings", **summary},
-        headers={"Idempotency-Key": summary["idempotency_key"]},
+        headers=headers,
+        ssl_context=ssl_context,
     )
 
 
-def send_email(email_url: str, summary: dict[str, Any], token: str) -> None:
+def send_email(email_url: str, summary: dict[str, Any], token: str, ssl_context: ssl.SSLContext | None = None) -> None:
     post_json(
         email_url,
         {
@@ -177,7 +191,22 @@ def send_email(email_url: str, summary: dict[str, Any], token: str) -> None:
             "Authorization": f"Bearer {token}",
             "Idempotency-Key": summary["idempotency_key"],
         },
+        ssl_context=ssl_context,
     )
+
+
+def gateway_ssl_context(values: Mapping[str, str]) -> ssl.SSLContext | None:
+    ca_file = values.get("SECURITY_GATEWAY_CA_FILE", "")
+    cert_file = values.get("SECURITY_GATEWAY_CLIENT_CERT_FILE", "")
+    key_file = values.get("SECURITY_GATEWAY_CLIENT_KEY_FILE", "")
+    if not any((ca_file, cert_file, key_file)):
+        return None
+    if not ca_file or not cert_file or not key_file:
+        raise ValueError("all SECURITY_GATEWAY_* TLS files are required together")
+    context = ssl.create_default_context(cafile=ca_file)
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
+    context.load_cert_chain(certfile=cert_file, keyfile=key_file)
+    return context
 
 
 def notify(report: dict[str, Any], workflow_url: str, env: Mapping[str, str] | None = None) -> list[NotificationResult]:
@@ -190,13 +219,23 @@ def notify(report: dict[str, Any], workflow_url: str, env: Mapping[str, str] | N
     ops_webhook = values.get("SECURITY_OPS_WEBHOOK_URL", "")
     email_url = values.get("SECURITY_EMAIL_WEBHOOK_URL", "")
     email_token = values.get("SECURITY_EMAIL_WEBHOOK_TOKEN", "")
+    gateway_url = values.get("SECURITY_GATEWAY_WEBHOOK_URL", "")
+    gateway_token = values.get("SECURITY_GATEWAY_INGRESS_TOKEN", "")
+    if gateway_url:
+        if not gateway_token:
+            raise ValueError("SECURITY_GATEWAY_INGRESS_TOKEN is required with the gateway URL")
+        ops_webhook = gateway_url
+    gateway_context = gateway_ssl_context(values)
     for name, url, sender in [("slack", slack, send_slack), ("webhook", ops_webhook, send_webhook)]:
         if not url:
             continue
         key = make_idempotency_key(report, name, values)
         summary = safe_summary(report, workflow_url, key)
         try:
-            sender(url, summary)
+            if name == "webhook":
+                sender(url, summary, gateway_context, gateway_token)
+            else:
+                sender(url, summary)
             results.append(NotificationResult(name, True))
         except (OSError, urllib.error.URLError, RuntimeError) as exc:
             results.append(NotificationResult(name, False, type(exc).__name__))
@@ -204,7 +243,7 @@ def notify(report: dict[str, Any], workflow_url: str, env: Mapping[str, str] | N
         key = make_idempotency_key(report, "email", values)
         summary = safe_summary(report, workflow_url, key)
         try:
-            send_email(email_url, summary, email_token)
+            send_email(email_url, summary, email_token, gateway_context)
             results.append(NotificationResult("email", True))
         except (OSError, urllib.error.URLError, RuntimeError) as exc:
             results.append(NotificationResult("email", False, type(exc).__name__))
