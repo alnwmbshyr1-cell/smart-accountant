@@ -460,3 +460,11 @@
 - [x] ربط job المراقبة ببوابة الجودة لمنع Build وRelease عند الفشل
 - [x] حفظ تقارير وإخفاقات المراقبة كـCI artifacts دون أسرار
 - [x] تحديث المهارة بدليل تشغيل CI وقيود Docker والـsecrets
+
+
+## Container and Dependency Security Scans
+- [x] إضافة Trivy filesystem وdependency scan مع SARIF وthreshold واضح
+- [x] إضافة فحص صور Docker المستخدمة في مختبر Alertmanager بإصدارات مثبتة
+- [x] إضافة فحص Snyk اختياري مشروط بوجود SNYK_TOKEN دون فشل زائف عند غيابه
+- [x] ربط نتائج الفحص ببوابة الجودة وحفظ التقارير دون أسرار
+- [x] تحديث المهارة بوصف سياسة الثغرات وطرق التشغيل المحلي وCI

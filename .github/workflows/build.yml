@@ -171,7 +171,7 @@ jobs:
             --output=security/osv-results.sarif
       - name: Upload OSV SARIF
         if: always() && hashFiles('security/osv-results.sarif') != ''
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: security/osv-results.sarif
           category: dart-dependencies
@@ -185,10 +185,139 @@ jobs:
         with:
           fail-on-severity: high
 
+  container-security:
+    name: Trivy container and filesystem scan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Prepare security report directory
+        run: mkdir -p security
+      - name: Trivy filesystem vulnerability and secret report
+        id: trivy_fs_report
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: sarif
+          output: security/trivy-fs.sarif
+          vuln-type: os,library
+          scanners: vuln,secret
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: 1
+      - name: Upload Trivy filesystem SARIF
+        if: always() && hashFiles('security/trivy-fs.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: security/trivy-fs.sarif
+          category: trivy-filesystem
+      - name: Trivy Prometheus image report
+        id: trivy_prometheus_report
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: prom/prometheus:v3.5.0
+          format: sarif
+          output: security/trivy-prometheus.sarif
+          vuln-type: os,library
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: 1
+      - name: Upload Trivy Prometheus SARIF
+        if: always() && hashFiles('security/trivy-prometheus.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: security/trivy-prometheus.sarif
+          category: trivy-prometheus-image
+      - name: Trivy Alertmanager image report
+        id: trivy_alertmanager_report
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: prom/alertmanager:v0.28.1
+          format: sarif
+          output: security/trivy-alertmanager.sarif
+          vuln-type: os,library
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: 1
+      - name: Upload Trivy Alertmanager SARIF
+        if: always() && hashFiles('security/trivy-alertmanager.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: security/trivy-alertmanager.sarif
+          category: trivy-alertmanager-image
+      - name: Enforce Trivy policy
+        if: steps.trivy_fs_report.outcome == 'failure' || steps.trivy_prometheus_report.outcome == 'failure' || steps.trivy_alertmanager_report.outcome == 'failure'
+        run: exit 1
+      - name: Upload Trivy reports on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-reports-${{ github.sha }}
+          path: security/*.sarif
+          if-no-files-found: ignore
+          retention-days: 14
+
+  snyk:
+    name: Optional Snyk dependency scan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Detect Snyk availability
+        id: snyk_token
+        shell: bash
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          if [[ -n "$SNYK_TOKEN" ]]; then
+            echo 'enabled=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'enabled=false' >> "$GITHUB_OUTPUT"
+            echo 'SNYK_TOKEN is not configured; skipping optional Snyk scan.'
+          fi
+      - name: Run Snyk Node dependency scan
+        id: snyk_node
+        if: steps.snyk_token.outputs.enabled == 'true'
+        continue-on-error: true
+        uses: snyk/actions/node@v1.0.0
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --file=backend/package.json --severity-threshold=high --sarif-file-output=snyk-node.sarif
+      - name: Upload Snyk SARIF
+        if: always() && hashFiles('snyk-node.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: snyk-node.sarif
+          category: snyk-node
+      - name: Enforce Snyk policy
+        if: steps.snyk_token.outputs.enabled == 'true' && steps.snyk_node.outcome == 'failure'
+        run: exit 1
+      - name: Upload Snyk report on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: snyk-reports-${{ github.sha }}
+          path: snyk-node.sarif
+          if-no-files-found: ignore
+          retention-days: 14
+
   quality:
     name: Quality gate
     runs-on: ubuntu-latest
-    needs: [fast, integration, coverage, prometheus-rules, security]
+    needs: [fast, integration, coverage, prometheus-rules, security, container-security, snyk]
     if: always()
     steps:
       - name: Require all quality jobs to pass
@@ -198,6 +327,8 @@ jobs:
           COVERAGE_RESULT: ${{ needs.coverage.result }}
           PROM_RULES_RESULT: ${{ needs.prometheus-rules.result }}
           SECURITY_RESULT: ${{ needs.security.result }}
+          CONTAINER_SECURITY_RESULT: ${{ needs.container-security.result }}
+          SNYK_RESULT: ${{ needs.snyk.result }}
         run: |
           set -euo pipefail
           echo "fast=${FAST_RESULT}"
@@ -205,11 +336,15 @@ jobs:
           echo "coverage=${COVERAGE_RESULT}"
           echo "prometheus-rules=${PROM_RULES_RESULT}"
           echo "security=${SECURITY_RESULT}"
+          echo "container-security=${CONTAINER_SECURITY_RESULT}"
+          echo "snyk=${SNYK_RESULT}"
           test "$FAST_RESULT" = success
           test "$INTEGRATION_RESULT" = success
           test "$COVERAGE_RESULT" = success
           test "$PROM_RULES_RESULT" = success
           test "$SECURITY_RESULT" = success
+          test "$CONTAINER_SECURITY_RESULT" = success
+          test "$SNYK_RESULT" = success || test "$SNYK_RESULT" = skipped
 
   build:
     name: Build and publish APK
