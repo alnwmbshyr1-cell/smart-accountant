@@ -74,6 +74,7 @@ class AuthGate extends StatelessWidget {
     final client = Supabase.instance.client;
     return StreamBuilder<AuthState>(stream: client.auth.onAuthStateChange, builder: (context, snapshot) {
       final session = snapshot.data?.session ?? client.auth.currentSession;
+      if (snapshot.data?.event == AuthChangeEvent.passwordRecovery) return const UpdatePasswordScreen();
       return session == null ? const AuthScreen() : SplashScreen(db: db);
     });
   }

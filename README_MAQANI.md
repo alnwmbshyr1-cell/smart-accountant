@@ -96,6 +96,18 @@ flutter run \
 
 شغّل Migration `supabase/migrations/202608230002_auth_profiles.sql` لإنشاء جدول `profiles` وربطه بـ `auth.users`. يجب أن تكون كل جداول التطبيق التي تحتوي بيانات مزرعة مرتبطة بعمود `owner_id uuid references auth.users(id)` وأن تحتوي على سياسات RLS تستخدم `auth.uid()`. لا تضع `service_role_key` داخل التطبيق؛ المفتاح الموجود في APK يجب أن يكون publishable/anon فقط، بينما الحماية الفعلية تُفرض في PostgreSQL عبر RLS [4].
 
+## إعادة تعيين كلمة المرور وتأكيد البريد
+
+تحتوي `lib/auth_screen.dart` الآن على ثلاث مراحل للمصادقة. يرسل المستخدم بريده من شاشة `نسيت كلمة المرور؟` عبر `resetPasswordForEmail`. عند الضغط على الرابط في البريد، يعيد Supabase المستخدم إلى رابط التطبيق العميق `io.maqani.app://auth-callback/`، ويعرض `AuthGate` شاشة `UpdatePasswordScreen` عند وصول حدث `PASSWORD_RECOVERY`. بعد إدخال كلمة المرور الجديدة تُحفظ عبر `updateUser(UserAttributes(password: ...))`.
+
+كما توجد شاشة `إعادة إرسال رسالة التأكيد` التي تستدعي `auth.resend(type: OtpType.signup, ...)`. لتفعيل الروابط، أضف العنوان التالي في Supabase Dashboard ضمن **Authentication > URL Configuration > Redirect URLs**:
+
+```text
+io.maqani.app://auth-callback/
+```
+
+وقد أُضيف `intent-filter` المقابل إلى `android/app/src/main/AndroidManifest.xml`. يجب إبقاء **Confirm email** مفعلاً من إعدادات مزود Email في Supabase إذا كان التطبيق يتطلب تأكيد البريد قبل السماح بالدخول. يعتمد هذا التدفق على واجهات `resetPasswordForEmail` و`updateUser` وحدث `onAuthStateChange` الرسمية [5] [6] [7].
+
 ## التشغيل
 
 بعد تثبيت Flutter وAndroid SDK، نفّذ:
@@ -119,3 +131,6 @@ flutter build apk --debug
 [2]: https://supabase.com/docs/guides/database/postgres/row-level-security "Supabase Row Level Security"
 [3]: https://supabase.com/docs/reference/dart/auth-onauthstatechange "Supabase Dart onAuthStateChange"
 [4]: https://supabase.com/docs/guides/getting-started/quickstarts/flutter "Supabase Flutter Quickstart"
+[5]: https://supabase.com/docs/reference/dart/auth-resetpasswordforemail "Supabase Dart resetPasswordForEmail"
+[6]: https://supabase.com/docs/reference/dart/auth-updateuser "Supabase Dart updateUser"
+[7]: https://supabase.com/docs/guides/auth/passwords "Supabase Password-based Auth"
