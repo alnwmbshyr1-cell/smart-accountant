@@ -1,0 +1,5 @@
+services:
+  alertmanager:
+    volumes:
+      - ./lab/alertmanager.slack.override.yml:/etc/alertmanager/alertmanager.local.yml:ro
+      - ./lab/secrets:/etc/alertmanager/secrets:ro

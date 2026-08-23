@@ -1,0 +1,16 @@
+global:
+  resolve_timeout: 30s
+  slack_api_url_file: /etc/alertmanager/secrets/slack_webhook_url
+
+route:
+  receiver: optional-slack
+  group_by: [alertname, job, severity, environment]
+  group_wait: 5s
+  group_interval: 10s
+  repeat_interval: 1h
+
+receivers:
+  - name: optional-slack
+    slack_configs:
+      - channel: "#smart-accountant-alerts-staging"
+        send_resolved: true

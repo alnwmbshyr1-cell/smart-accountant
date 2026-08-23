@@ -1,0 +1,18 @@
+groups:
+  - name: smart-accountant-local
+    interval: 15s
+    rules:
+      - alert: SmartAccountantLocalHigh5xxRate
+        expr: |
+          sum(rate(smart_accountant_http_requests_total{job="smart-accountant-backend",status_code=~"5.."}[1m]))
+          /
+          clamp_min(sum(rate(smart_accountant_http_requests_total{job="smart-accountant-backend"}[1m])), 0.001)
+          > 0.05
+        for: 45s
+        labels:
+          severity: warning
+          environment: local
+        annotations:
+          summary: Local Smart Accountant 5xx rate is high
+          description: The local fixture has exceeded 5% 5xx responses for 45 seconds.
+          runbook: https://runbooks.example.com/smart-accountant/local-5xx

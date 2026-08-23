@@ -444,3 +444,11 @@
 - [x] إضافة فحص promtool إلى CI مع تثبيت نسخة Prometheus بشكل حتمي
 - [x] تحديث المهارة بدليل promtool وقراءة نتائج الاختبار
 - [x] توثيق وتشغيل مسار التحقق؛ promtool غير مثبت محلياً ويُشغّل داخل CI عبر حاوية رسمية
+
+
+## Local Alertmanager Compose Lab
+- [x] إنشاء Docker Compose محلي يربط Prometheus وAlertmanager وWebhook receiver
+- [x] إضافة receiver اختباري يسجل payloads firing وresolved دون أسرار
+- [x] إضافة إعداد Slack اختياري عبر secret file أو environment خارج Git
+- [x] إضافة سكربت تشغيل وتنظيف واختبار health وalert delivery
+- [x] تحديث المهارة بتركيب المختبر وقيود عدم استخدام Slack الإنتاجي محلياً

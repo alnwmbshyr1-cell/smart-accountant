@@ -1,0 +1,10 @@
+secrets/*
+!secrets/.gitkeep
+state/*
+!state/.gitkeep
+received/*
+!received/.gitkeep
+prometheus-data/*
+!prometheus-data/.gitkeep
+alertmanager-data/*
+!alertmanager-data/.gitkeep

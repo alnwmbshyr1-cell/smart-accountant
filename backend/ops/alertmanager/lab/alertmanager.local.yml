@@ -1,0 +1,25 @@
+global:
+  resolve_timeout: 30s
+  # The local lab does not require a Slack secret. Set SLACK_API_URL_FILE
+  # in a private override only when testing a real Slack workspace.
+
+route:
+  receiver: local-webhook
+  group_by: [alertname, job, severity, environment]
+  group_wait: 5s
+  group_interval: 10s
+  repeat_interval: 1h
+
+receivers:
+  - name: local-webhook
+    webhook_configs:
+      - url: http://webhook-receiver:8080/alertmanager
+        send_resolved: true
+
+  # Optional real Slack receiver for staging only. Keep it in a private
+  # override file and never commit the webhook URL.
+  - name: optional-slack
+    slack_configs:
+      - api_url_file: /etc/alertmanager/secrets/slack_webhook_url
+        channel: "#smart-accountant-alerts"
+        send_resolved: true

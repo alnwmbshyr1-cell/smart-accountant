@@ -1,0 +1,57 @@
+services:
+  metrics-fixture:
+    image: python:3.12-alpine
+    working_dir: /app
+    command: python /app/metrics_fixture.py
+    volumes:
+      - ./lab/metrics_fixture.py:/app/metrics_fixture.py:ro
+      - ./lab/state:/state
+    networks: [alerting-lab]
+
+  webhook-receiver:
+    image: python:3.12-alpine
+    working_dir: /app
+    command: python /app/webhook_receiver.py
+    volumes:
+      - ./lab/webhook_receiver.py:/app/webhook_receiver.py:ro
+      - ./lab/received:/received
+    ports:
+      - "18080:8080"
+    networks: [alerting-lab]
+
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.local.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-lifecycle
+    volumes:
+      - ./lab/prometheus.local.yml:/etc/prometheus/prometheus.local.yml:ro
+      - ../prometheus/tests:/etc/prometheus/tests:ro
+      - ./lab/prometheus-data:/prometheus
+    ports:
+      - "19090:9090"
+    depends_on:
+      - metrics-fixture
+      - alertmanager
+    networks: [alerting-lab]
+
+  alertmanager:
+    image: prom/alertmanager:v0.28.1
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.local.yml
+      - --storage.path=/alertmanager
+      - --web.enable-lifecycle
+    volumes:
+      - ./lab/alertmanager.local.yml:/etc/alertmanager/alertmanager.local.yml:ro
+      - ./lab/secrets:/etc/alertmanager/secrets:ro
+      - ./lab/alertmanager-data:/alertmanager
+    ports:
+      - "19093:9093"
+    depends_on:
+      - webhook-receiver
+    networks: [alerting-lab]
+
+networks:
+  alerting-lab:
+    driver: bridge
