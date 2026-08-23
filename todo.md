@@ -566,3 +566,10 @@
 - [x] ربط التنبيه بوظيفة always في Workflow مع الاحتفاظ بفشل الاختبار
 - [x] إضافة اختبارات payload وIdempotency ومسار القناة غير المفعلة
 - [x] تحديث المهارة والتوثيق ثم التحقق والدفع
+
+
+## Grafana Live Load Dashboard
+- [x] إضافة Dashboard JSON لمقاييس k6 والبوابة وRedis
+- [x] إضافة provisioning لمصدر Prometheus ولوحة Grafana
+- [x] إضافة اختبار صحة JSON وPromQL وتوثيق الاستيراد
+- [x] تحديث المهارة والتحقق ثم دفع التعديل

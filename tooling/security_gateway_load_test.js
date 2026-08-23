@@ -9,6 +9,7 @@ const clientCert = __ENV.GATEWAY_CLIENT_CERT || '';
 const clientKey = __ENV.GATEWAY_CLIENT_KEY || '';
 const duplicateRate = Number(__ENV.DUPLICATE_RPS || 50);
 const uniqueRate = Number(__ENV.UNIQUE_RPS || 950);
+const testId = __ENV.TEST_ID || `local-${Date.now()}`;
 
 const duplicateErrors = new Rate('duplicate_request_errors');
 const gatewayLatency = new Trend('gateway_latency_ms');
@@ -72,7 +73,7 @@ function post(key, expectedDuplicate) {
     idempotency_key: key,
     findings: [{ severity: 'critical', rule_id: 'LOAD-TEST', source: 'k6' }],
   });
-  const response = http.post(gatewayUrl, payload, { headers: headers(key), tags: { scenario: expectedDuplicate ? 'duplicate' : 'unique' } });
+  const response = http.post(gatewayUrl, payload, { headers: headers(key), tags: { scenario: expectedDuplicate ? 'duplicate' : 'unique', testid: testId } });
   gatewayLatency.add(response.timings.duration);
   const accepted = check(response, {
     'status is accepted or duplicate': (r) => r.status === 202 || (expectedDuplicate && r.status === 200),

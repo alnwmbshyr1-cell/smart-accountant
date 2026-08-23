@@ -45,3 +45,29 @@ node -e "JSON.parse(require('fs').readFileSync('smart-accountant-backend-dashboa
 ```
 
 The dashboard is a visualization layer, not a replacement for Alertmanager. Keep operational alerts in Prometheus rule files and configure Alertmanager receivers, owners, runbooks, and escalation policies separately.
+
+
+## Live k6 load dashboard
+
+Import `smart-accountant-load-dashboard.json` or let the existing dashboard provider discover it from `/etc/grafana/dashboards`. The dashboard refreshes every 5 seconds and uses datasource UID `prometheus`. It includes k6 request rate by scenario, p50/p95/p99 latency, request/check failures, gateway 5xx and forwarding errors, Redis health, idempotency claims/duplicates, and gateway p95 latency.
+
+For live k6 series, run k6 with the Prometheus remote-write output and a unique test label:
+
+```bash
+export K6_PROMETHEUS_RW_SERVER_URL=https://prometheus.example/api/v1/write
+export K6_PROMETHEUS_RW_TREND_STATS='p(50),p(90),p(95),p(99),avg,med,max'
+k6 run \
+  -e TEST_ID="staging-$(date -u +%Y%m%dT%H%M%SZ)" \
+  --out experimental-prometheus-rw \
+  tooling/security_gateway_load_test.js
+```
+
+Configure Prometheus remote write ingestion and authentication according to the Prometheus deployment; do not put credentials in the command history or dashboard JSON. The dashboard expects the k6 output metric names used by the Prometheus remote-write output and the `testid` and `scenario` tags emitted by the load script. If the k6 remote-write metric names differ in your pinned k6 version, inspect `/api/v1/label/__name__/values` and adjust the dashboard queries rather than inventing aliases.
+
+Redis panels require a Redis exporter exposing `redis_*` metrics. Gateway panels require the matching `smart_accountant_*` counters and histograms from `prom-client`. Keep these metrics low-cardinality: never add request IDs, users, Arabic text, tokens, or full idempotency keys as labels. Use Grafana's dashboard variable to select a `testid` and keep the time range at `now-15m` during the run.
+
+Validate the JSON before import:
+
+```bash
+node -e "JSON.parse(require('fs').readFileSync('smart-accountant-load-dashboard.json','utf8')); console.log('load dashboard JSON valid')"
+```
