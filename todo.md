@@ -484,3 +484,10 @@
 - [x] ربط الإخطار ببوابة الجودة ومنع النشر عند وجود Critical
 - [x] إضافة اختبارات no-critical وcritical وredaction وفشل القناة
 - [x] تحديث المهارة بدليل التشغيل والتدوير والـdeduplication
+
+
+## Webhook Retry and Idempotency
+- [x] إضافة backoff محدود لحالات 429 و5xx مع احترام Retry-After
+- [x] إضافة مفتاح idempotency ثابت لكل Workflow/finding/channel
+- [x] اختبار 429 و5xx وإعادة المحاولة وعدم تكرار الرسائل
+- [x] تحديث Workflow والمهارة والتوثيق ثم دفع التعديل

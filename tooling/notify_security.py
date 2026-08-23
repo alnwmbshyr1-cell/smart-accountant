@@ -1,21 +1,23 @@
 #!/usr/bin/env python3
-"""Notify configured channels when a unified SARIF report contains critical findings.
-
-The script never sends the SARIF document itself. It sends only a bounded summary
-and a link to the GitHub workflow. Secrets are supplied through environment vars.
-"""
+"""Notify configured channels for critical findings in a unified security report."""
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import sys
+import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
-from typing import Any
+from email.utils import parsedate_to_datetime
+from typing import Any, Callable, Mapping
 
 MAX_FINDINGS = 10
+MAX_ATTEMPTS = 3
+DEFAULT_BACKOFF_SECONDS = 1.0
+RETRYABLE_STATUS_CODES = frozenset({429, 500, 501, 502, 503, 504, 505, 507, 508, 510, 511})
 
 
 @dataclass(frozen=True)
@@ -33,12 +35,40 @@ def load_report(path: str) -> dict[str, Any]:
     return value
 
 
-def critical_findings(report: dict[str, Any]) -> list[dict[str, Any]]:
+def critical_findings(report: Mapping[str, Any]) -> list[dict[str, Any]]:
     findings = report.get("findings") or []
     return [item for item in findings if isinstance(item, dict) and item.get("severity") == "critical"]
 
 
-def safe_summary(report: dict[str, Any], workflow_url: str) -> dict[str, Any]:
+def finding_fingerprint(findings: list[dict[str, Any]]) -> str:
+    stable = [
+        {
+            "source": item.get("source", ""),
+            "rule_id": item.get("rule_id", ""),
+            "file": item.get("file", ""),
+            "line": item.get("line", ""),
+            "severity": item.get("severity", ""),
+        }
+        for item in findings
+    ]
+    encoded = json.dumps(stable, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def make_idempotency_key(report: Mapping[str, Any], channel: str, context: Mapping[str, str] | None = None) -> str:
+    values = context or os.environ
+    material = {
+        "repository": values.get("GITHUB_REPOSITORY", "local"),
+        "workflow": values.get("GITHUB_WORKFLOW", "security"),
+        "sha": values.get("GITHUB_SHA", "local"),
+        "channel": channel,
+        "critical_fingerprint": finding_fingerprint(critical_findings(report)),
+    }
+    encoded = json.dumps(material, ensure_ascii=True, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return "sa-" + hashlib.sha256(encoded).hexdigest()[:32]
+
+
+def safe_summary(report: Mapping[str, Any], workflow_url: str, idempotency_key: str = "") -> dict[str, Any]:
     findings = critical_findings(report)
     rows = []
     for item in findings[:MAX_FINDINGS]:
@@ -57,21 +87,60 @@ def safe_summary(report: dict[str, Any], workflow_url: str) -> dict[str, Any]:
         "shown": len(rows),
         "findings": rows,
         "workflow_url": workflow_url[:500],
+        "idempotency_key": idempotency_key,
     }
 
 
-def post_json(url: str, payload: dict[str, Any], timeout: float = 10.0, headers: dict[str, str] | None = None) -> None:
+def _retry_after_seconds(error: urllib.error.HTTPError, default: float) -> float:
+    value = error.headers.get("Retry-After") if error.headers else None
+    if value:
+        try:
+            return max(0.0, min(float(value), 60.0))
+        except ValueError:
+            try:
+                retry_at = parsedate_to_datetime(value).timestamp()
+                return max(0.0, min(retry_at - time.time(), 60.0))
+            except (TypeError, ValueError, OverflowError):
+                pass
+    return min(default, 60.0)
+
+
+def post_json(
+    url: str,
+    payload: dict[str, Any],
+    timeout: float = 10.0,
+    headers: dict[str, str] | None = None,
+    attempts: int = MAX_ATTEMPTS,
+    sleep_fn: Callable[[float], None] = time.sleep,
+) -> None:
     request_headers = {"Content-Type": "application/json", "User-Agent": "smart-accountant-security-notifier/1"}
     request_headers.update(headers or {})
-    request = urllib.request.Request(
-        url,
-        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-        headers=request_headers,
-        method="POST",
-    )
-    with urllib.request.urlopen(request, timeout=timeout) as response:
-        if response.status < 200 or response.status >= 300:
-            raise RuntimeError(f"notification endpoint returned HTTP {response.status}")
+    body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    last_error: Exception | None = None
+    for attempt in range(1, max(1, attempts) + 1):
+        request = urllib.request.Request(url, data=body, headers=request_headers, method="POST")
+        try:
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                if 200 <= response.status < 300:
+                    return
+                error = RuntimeError(f"notification endpoint returned HTTP {response.status}")
+                last_error = error
+                if response.status not in RETRYABLE_STATUS_CODES or attempt == attempts:
+                    raise error
+                delay = min(DEFAULT_BACKOFF_SECONDS * (2 ** (attempt - 1)), 60.0)
+        except urllib.error.HTTPError as error:
+            last_error = error
+            if error.code not in RETRYABLE_STATUS_CODES or attempt == attempts:
+                raise
+            delay = _retry_after_seconds(error, DEFAULT_BACKOFF_SECONDS * (2 ** (attempt - 1)))
+        except (urllib.error.URLError, TimeoutError, OSError) as error:
+            last_error = error
+            if attempt == attempts:
+                raise
+            delay = min(DEFAULT_BACKOFF_SECONDS * (2 ** (attempt - 1)), 60.0)
+        sleep_fn(delay)
+    if last_error:
+        raise last_error
 
 
 def send_slack(webhook_url: str, summary: dict[str, Any]) -> None:
@@ -82,44 +151,58 @@ def send_slack(webhook_url: str, summary: dict[str, Any]) -> None:
         lines.append(f"…and {summary['total_critical'] - summary['shown']} more. See GitHub Security.")
     if summary["workflow_url"]:
         lines.append(summary["workflow_url"])
-    post_json(webhook_url, {"text": "\n".join(lines)})
+    post_json(
+        webhook_url,
+        {"text": "\n".join(lines), "idempotency_key": summary["idempotency_key"]},
+        headers={"Idempotency-Key": summary["idempotency_key"]},
+    )
 
 
 def send_webhook(webhook_url: str, summary: dict[str, Any]) -> None:
-    post_json(webhook_url, {"event": "critical_security_findings", **summary})
+    post_json(
+        webhook_url,
+        {"event": "critical_security_findings", **summary},
+        headers={"Idempotency-Key": summary["idempotency_key"]},
+    )
 
 
 def send_email(email_url: str, summary: dict[str, Any], token: str) -> None:
-    # The endpoint is an internal mail gateway, not a provider-specific API.
-    post_json(email_url, {
-        "subject": f"Smart Accountant: {summary['total_critical']} critical security finding(s)",
-        "text": json.dumps(summary, ensure_ascii=False),
-    }, timeout=10.0, headers={"Authorization": f"Bearer {token}"})
+    post_json(
+        email_url,
+        {
+            "subject": f"Smart Accountant: {summary['total_critical']} critical security finding(s)",
+            "text": json.dumps(summary, ensure_ascii=False),
+        },
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Idempotency-Key": summary["idempotency_key"],
+        },
+    )
 
 
-def notify(report: dict[str, Any], workflow_url: str, env: dict[str, str] | None = None) -> list[NotificationResult]:
+def notify(report: dict[str, Any], workflow_url: str, env: Mapping[str, str] | None = None) -> list[NotificationResult]:
     values = os.environ if env is None else env
     findings = critical_findings(report)
     if not findings:
         return []
-    summary = safe_summary(report, workflow_url)
     results: list[NotificationResult] = []
     slack = values.get("SECURITY_SLACK_WEBHOOK_URL", "")
     ops_webhook = values.get("SECURITY_OPS_WEBHOOK_URL", "")
     email_url = values.get("SECURITY_EMAIL_WEBHOOK_URL", "")
     email_token = values.get("SECURITY_EMAIL_WEBHOOK_TOKEN", "")
-    for name, url, sender in [
-        ("slack", slack, send_slack),
-        ("webhook", ops_webhook, send_webhook),
-    ]:
+    for name, url, sender in [("slack", slack, send_slack), ("webhook", ops_webhook, send_webhook)]:
         if not url:
             continue
+        key = make_idempotency_key(report, name, values)
+        summary = safe_summary(report, workflow_url, key)
         try:
             sender(url, summary)
             results.append(NotificationResult(name, True))
         except (OSError, urllib.error.URLError, RuntimeError) as exc:
             results.append(NotificationResult(name, False, type(exc).__name__))
     if email_url and email_token:
+        key = make_idempotency_key(report, "email", values)
+        summary = safe_summary(report, workflow_url, key)
         try:
             send_email(email_url, summary, email_token)
             results.append(NotificationResult("email", True))
@@ -145,7 +228,6 @@ def main() -> int:
     if failed:
         print("One or more configured notification channels failed.", file=sys.stderr)
         return 2
-    # The security gate, not the notifier, enforces the Critical policy.
     return 0
 
 
