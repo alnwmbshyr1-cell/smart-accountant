@@ -1,0 +1,23 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - /etc/prometheus/rules/smart-accountant-alerts.yml
+
+scrape_configs:
+  - job_name: smart-accountant-backend
+    scheme: https
+    metrics_path: /metrics
+    scrape_interval: 15s
+    scrape_timeout: 10s
+    static_configs:
+      - targets:
+          - api.example.com
+        labels:
+          service: smart-accountant-backend
+          environment: production
+    # Mount this file as a Docker/Kubernetes secret. Never inline the token here.
+    bearer_token_file: /etc/prometheus/secrets/metrics_token
+    tls_config:
+      min_version: TLS13

@@ -135,17 +135,38 @@ describe('Supabase authenticated Flutter-to-Backend contract', () => {
         body: JSON.stringify({ text: 'نص محاسبي سري لا يجب تسجيله' }),
       });
       const metricsResponse = await realFetch(`${baseUrl}/metrics`);
-      const metrics = await metricsResponse.json() as Record<string, number>;
+      const metricsText = await metricsResponse.text();
+      const diagnosticsResponse = await realFetch(`${baseUrl}/metrics.json`);
+      const metrics = await diagnosticsResponse.json() as Record<string, number>;
       const serializedLogs = [...info.mock.calls, ...warn.mock.calls].flat().join(' ');
 
       expect(response.status).toBe(401);
       expect(response.headers.get('x-request-id')).toBe('integration-request-1');
+      expect(metricsResponse.headers.get('content-type')).toContain('text/plain');
+      expect(metricsText).toContain('smart_accountant_http_requests_total');
       expect(metrics.auth_failures_total).toBeGreaterThan(0);
       expect(serializedLogs).not.toContain('Bearer');
       expect(serializedLogs).not.toContain('نص محاسبي سري');
     } finally {
       info.mockRestore();
       warn.mockRestore();
+    }
+  });
+
+  it('protects Prometheus exposition when a scrape token is configured', async () => {
+    const previous = process.env.METRICS_SCRAPE_TOKEN;
+    process.env.METRICS_SCRAPE_TOKEN = 'metrics-test-token';
+    try {
+      const unauthorized = await realFetch(`${baseUrl}/metrics`);
+      const authorized = await realFetch(`${baseUrl}/metrics`, {
+        headers: { authorization: 'Bearer metrics-test-token' },
+      });
+      expect(unauthorized.status).toBe(401);
+      expect(authorized.status).toBe(200);
+      expect(await authorized.text()).toContain('smart_accountant_http_requests_total');
+    } finally {
+      if (previous === undefined) delete process.env.METRICS_SCRAPE_TOKEN;
+      else process.env.METRICS_SCRAPE_TOKEN = previous;
     }
   });
 });

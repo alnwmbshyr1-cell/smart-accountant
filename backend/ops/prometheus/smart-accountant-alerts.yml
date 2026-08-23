@@ -1,0 +1,70 @@
+groups:
+  - name: smart-accountant-backend
+    interval: 30s
+    rules:
+      - alert: SmartAccountantBackendDown
+        expr: up{job="smart-accountant-backend"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: Smart Accountant Backend is unreachable
+          description: Prometheus has not scraped the backend successfully for 2 minutes.
+          runbook: https://runbooks.example.com/smart-accountant/backend-down
+
+      - alert: SmartAccountantHigh5xxRate
+        expr: |
+          sum(rate(smart_accountant_http_requests_total{job="smart-accountant-backend",status_code=~"5.."}[5m]))
+          /
+          clamp_min(sum(rate(smart_accountant_http_requests_total{job="smart-accountant-backend"}[5m])), 0.001)
+          > 0.05
+        for: 10m
+        labels:
+          severity: high
+        annotations:
+          summary: Smart Accountant backend 5xx rate is high
+          description: More than 5% of backend requests returned 5xx for 10 minutes.
+          runbook: https://runbooks.example.com/smart-accountant/high-5xx
+
+      - alert: SmartAccountantGeminiFailures
+        expr: rate(smart_accountant_gemini_failures_total{job="smart-accountant-backend"}[10m]) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Gemini upstream failures are increasing
+          description: Gemini failures exceed 0.1 per second for 10 minutes; local fallback should remain available.
+          runbook: https://runbooks.example.com/smart-accountant/gemini-upstream
+
+      - alert: SmartAccountantHighP95Latency
+        expr: |
+          histogram_quantile(0.95,
+            sum by (le) (rate(smart_accountant_http_request_duration_seconds_bucket{job="smart-accountant-backend"}[5m]))
+          ) > 2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Smart Accountant backend p95 latency is high
+          description: Backend p95 request latency exceeds 2 seconds for 10 minutes.
+          runbook: https://runbooks.example.com/smart-accountant/latency
+
+      - alert: SmartAccountantAuthFailureSpike
+        expr: rate(smart_accountant_auth_failures_total{job="smart-accountant-backend"}[5m]) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Authentication failures have spiked
+          description: JWT rejection rate exceeds 1 per second for 5 minutes; investigate abuse or client clock issues.
+          runbook: https://runbooks.example.com/smart-accountant/auth-spike
+
+      - alert: SmartAccountantHighMemory
+        expr: smart_accountant_process_rss_bytes{job="smart-accountant-backend"} > 536870912
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Smart Accountant backend RSS is above 512 MiB
+          description: Process resident memory has exceeded the configured baseline.
+          runbook: https://runbooks.example.com/smart-accountant/memory

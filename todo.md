@@ -411,3 +411,12 @@
 - [x] إضافة health/readiness endpoints مناسبة للتشغيل الإنتاجي
 - [x] إضافة اختبارات observability تمنع تسريب Authorization والنص المحاسبي الكامل؛ الأسرار لا تُقرأ أصلاً من الطلب
 - [x] تحديث مهارة Smart Accountant بممارسات التنبيه والاحتفاظ بالسجلات والاستجابة للحوادث
+
+
+## Prometheus Production Export
+- [x] إضافة prom-client وPrometheus text exposition على `/metrics`
+- [x] الإبقاء على `/metrics.json` للتشخيص الداخلي وحماية المسارين بـMETRICS_SCRAPE_TOKEN الاختياري
+- [x] إضافة prometheus.yml وقواعد تنبيه مع bearer_token_file وHTTPS وlabels منخفضة الكاردينالية
+- [x] إضافة اختبار Content-Type واسم metric ورفض/قبول scrape token
+- [x] تحديث المهارة وREADME بممارسات promtool والتحقق الإنتاجي
+- [ ] تشغيل promtool في CI أو بيئة Prometheus فعلية؛ غير متوفر محلياً في هذه الجولة

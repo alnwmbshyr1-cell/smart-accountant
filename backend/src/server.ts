@@ -4,7 +4,14 @@ import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import { z } from 'zod';
 import { createJwtVerifier, requireJwt } from './auth.js';
-import { getMetrics, logEvent, requestObservability, recordGeminiFailure } from './observability.js';
+import {
+  getMetrics,
+  logEvent,
+  prometheusContentType,
+  prometheusMetrics,
+  requestObservability,
+  recordGeminiFailure,
+} from './observability.js';
 
 const app = express();
 const port = Number(process.env.PORT ?? 8080);
@@ -101,7 +108,22 @@ app.get('/readyz', (_req, res) => {
   return res.status(ready ? 200 : 503).json({ ready });
 });
 
-app.get('/metrics', (_req, res) => res.json(getMetrics()));
+function requireMetricsScrapeToken(req: Request, res: Response, next: NextFunction) {
+  const expected = process.env.METRICS_SCRAPE_TOKEN?.trim();
+  if (!expected) return next();
+  if (req.header('authorization') !== `Bearer ${expected}`) {
+    return res.status(401).json({ error: 'metrics_unauthorized' });
+  }
+  return next();
+}
+
+app.get('/metrics', requireMetricsScrapeToken, async (_req, res) => {
+  res.setHeader('content-type', prometheusContentType());
+  return res.send(await prometheusMetrics());
+});
+
+// JSON remains useful for internal diagnostics but is not the Prometheus scrape target.
+app.get('/metrics.json', requireMetricsScrapeToken, (_req, res) => res.json(getMetrics()));
 
 app.post('/v1/accounting/parse', requireJwt(jwtVerifier), async (req, res) => {
   const request = commandRequestSchema.safeParse(req.body);
