@@ -81,4 +81,31 @@ void main() {
 
     expect(await backend.parseCommand('أمر'), isNull);
   });
+
+  test('refreshes the token and retries exactly once after 401', () async {
+    final sentTokens = <String>[];
+    var calls = 0;
+    final backend = AccountingBackendClient(
+      baseUrl: 'https://api.example.test',
+      accessTokenLoader: () async => 'old-token',
+      refreshAccessToken: () async => 'new-token',
+      httpClient: MockClient((request) async {
+        sentTokens.add(request.headers['authorization']!);
+        calls++;
+        return calls == 1
+            ? http.Response('expired', 401)
+            : http.Response(
+                '{"type":"مصروف","amount":1000,"desc":"بنزين"}',
+                200,
+                headers: {'content-type': 'application/json; charset=utf-8'},
+              );
+      }),
+    );
+
+    final result = await backend.parseCommand('مصروف بنزين');
+
+    expect(result?['amount'], 1000);
+    expect(sentTokens, ['Bearer old-token', 'Bearer new-token']);
+    expect(calls, 2);
+  });
 }

@@ -388,3 +388,10 @@
 - [x] اختبار Supabase JWT بتوقيع RSA محلياً: التوكن الصحيح، audience الخاطئ، role الخاطئ، والانتهاء؛ واختبار Firebase adapter للـrevocation failure
 - [ ] اختبار حفظ SQLite المحلي وعدم التكرار عند فشل Backend وإعادة المحاولة عبر outbox
 - [x] تحديث دليل التشغيل ونتائج التحقق دون تضمين أسرار حقيقية
+
+
+## Flutter Auth Token Binding
+- [x] تحديث مهارة Smart Accountant لتوثيق ربط Flutter بـFirebase/Supabase access token مع كل طلب
+- [x] إضافة نمط token loader قابل للحقن مع إعادة محاولة واحدة بعد 401؛ ربط SDK الفعلي يبقى اختيارياً لكل المشروع
+- [x] منع إرسال GEMINI_API_KEY من Flutter والحفاظ على fallback المحلي عند فشل الشبكة أو المصادقة
+- [x] إضافة اختبارات عميل تغطي Authorization وغياب التوكن و401 مع refresh وtimeout وfallback؛ 5 اختبارات ناجحة
