@@ -1,7 +1,7 @@
 name: smart_accountant
 description: "Smart Accountant - المحاسب الذكي لتسجيل العمليات وحسابات المبيعات والمشتريات والديون مع حاسبة ذكية وتصدير PDF."
 publish_to: 'none'
-version: 1.0.0+1
+version: 3.0.0+1
 
 environment:
   sdk: '>=3.5.0 <4.0.0'
@@ -69,6 +69,9 @@ dev_dependencies:
   build_runner: ^2.4.8
 
 dependency_overrides:
+  # vosk_flutter 0.3.x يطلب permission_handler 10.x، لكن Android plugin القديم يستخدم Registrar المحذوف.
+  # نفرض حزمة permission_handler الحديثة مع الحفاظ على API المتوافق في التطبيق.
+  permission_handler: ^12.0.1
   # vosk_flutter 0.3.x يطلب http 0.13.x بينما google_fonts 6.x يطلب http 1.x.
   # هذا override يحتاج تحقق compile؛ إن فشل يلزم fork محدث لـ vosk_flutter.
   http: ^1.5.0

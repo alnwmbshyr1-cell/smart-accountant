@@ -1,4 +1,5 @@
 import 'dart:convert';
+
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -20,7 +21,7 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: (db, version) async {
         await db.execute('''
           CREATE TABLE $_tableName (
@@ -37,8 +38,142 @@ class DatabaseService {
         await db.execute('CREATE INDEX idx_tx_date ON $_tableName (date)');
         await db.execute('CREATE INDEX idx_tx_type ON $_tableName (type)');
         await db.execute('CREATE INDEX idx_tx_seed ON $_tableName (is_seed)');
+        await _createStructuredTables(db);
+      },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        await _createStructuredTables(db);
       },
     );
+  }
+
+  Future<void> _createStructuredTables(Database db) async {
+    await db.execute('''CREATE TABLE IF NOT EXISTS expenses (
+      id TEXT PRIMARY KEY, description TEXT NOT NULL, amount REAL NOT NULL, date TEXT NOT NULL
+    )''');
+    await db.execute('''CREATE TABLE IF NOT EXISTS purchases (
+      id TEXT PRIMARY KEY, description TEXT NOT NULL, amount REAL NOT NULL, date TEXT NOT NULL
+    )''');
+    await db.execute('''CREATE TABLE IF NOT EXISTS sales (
+      id TEXT PRIMARY KEY, description TEXT NOT NULL, amount REAL NOT NULL, date TEXT NOT NULL
+    )''');
+    await db.execute('''CREATE TABLE IF NOT EXISTS debt_for_me (
+      id TEXT PRIMARY KEY, person TEXT NOT NULL, amount REAL NOT NULL, date TEXT NOT NULL
+    )''');
+    await db.execute('''CREATE TABLE IF NOT EXISTS debt_on_me (
+      id TEXT PRIMARY KEY, person TEXT NOT NULL, amount REAL NOT NULL, date TEXT NOT NULL
+    )''');
+    await db.execute('''CREATE TABLE IF NOT EXISTS inventory (
+      id TEXT PRIMARY KEY, item TEXT NOT NULL, quantity REAL NOT NULL,
+      unit_price REAL NOT NULL, total REAL NOT NULL, date TEXT NOT NULL
+    )''');
+    for (final table in [
+      'expenses',
+      'purchases',
+      'sales',
+      'debt_for_me',
+      'debt_on_me',
+      'inventory'
+    ]) {
+      await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_${table}_date ON $table (date)');
+    }
+  }
+
+  /// Saves a normalized parser result to its dedicated table and keeps the
+  /// legacy transactions ledger synchronized for reports and old screens.
+  Future<void> saveParsedCommand(Map<String, dynamic> command) async {
+    await migrateFromSharedPreferencesIfNeeded();
+    final db = await database;
+    final type =
+        command['type']?.toString() ?? command['النوع']?.toString() ?? 'مصروف';
+    final amount = _asDouble(command['amount'] ?? command['المبلغ']);
+    if (amount <= 0) throw ArgumentError('amount must be positive');
+    final now = command['date']?.toString() ?? DateTime.now().toIso8601String();
+    final id = '${DateTime.now().microsecondsSinceEpoch}_${type.hashCode}';
+    final description =
+        (command['description'] ?? command['الوصف'] ?? 'عام').toString().trim();
+    final person =
+        (command['person'] ?? command['الاسم'] ?? 'عام').toString().trim();
+    final item = (command['item'] ?? description).toString().trim();
+    final quantity =
+        _asDouble(command['quantity'] ?? command['الكمية'], fallback: 1);
+    final unitPrice = _asDouble(command['unit_price'] ?? command['سعر_الوحدة'],
+        fallback: amount);
+    final table = switch (type) {
+      'مبيعات' => 'sales',
+      'مشتريات' => 'purchases',
+      'دين_لي' => 'debt_for_me',
+      'دين_علي' => 'debt_on_me',
+      'مخزون' => 'inventory',
+      _ => 'expenses',
+    };
+    await db.transaction((txn) async {
+      if (table == 'inventory') {
+        await txn.insert(table, {
+          'id': id,
+          'item': item,
+          'quantity': quantity,
+          'unit_price': unitPrice,
+          'total': amount,
+          'date': now,
+        });
+      } else if (table == 'debt_for_me' || table == 'debt_on_me') {
+        await txn.insert(
+            table, {'id': id, 'person': person, 'amount': amount, 'date': now});
+      } else {
+        await txn.insert(table, {
+          'id': id,
+          'description': description,
+          'amount': amount,
+          'date': now
+        });
+      }
+      await txn.insert(_tableName, {
+        'id': id,
+        'type': type,
+        'amount': amount,
+        'description': description,
+        'date': now,
+        'is_seed': 0,
+      });
+    });
+  }
+
+  Future<double> getStructuredTodayTotal(String type) async {
+    final db = await database;
+    final table = switch (type) {
+      'مبيعات' => 'sales',
+      'مشتريات' => 'purchases',
+      'دين_لي' => 'debt_for_me',
+      'دين_علي' => 'debt_on_me',
+      'مخزون' => 'inventory',
+      _ => 'expenses',
+    };
+    final column = table == 'inventory' ? 'total' : 'amount';
+    final start = DateTime.now();
+    final date = DateTime(start.year, start.month, start.day).toIso8601String();
+    final rows = await db.rawQuery(
+        'SELECT COALESCE(SUM($column), 0) AS total FROM $table WHERE date >= ?',
+        [date]);
+    return _asDouble(rows.first['total']);
+  }
+
+  Future<List<Map<String, dynamic>>> getStructuredRecords(String type) async {
+    final db = await database;
+    final table = switch (type) {
+      'مبيعات' => 'sales',
+      'مشتريات' => 'purchases',
+      'دين_لي' => 'debt_for_me',
+      'دين_علي' => 'debt_on_me',
+      'مخزون' => 'inventory',
+      _ => 'expenses',
+    };
+    return db.query(table, orderBy: 'date DESC', limit: 100);
+  }
+
+  static double _asDouble(dynamic value, {double fallback = 0}) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString() ?? '') ?? fallback;
   }
 
   /// ترحيل البيانات القديمة من SharedPreferences إلى SQLite إن وجدت لمرة واحدة

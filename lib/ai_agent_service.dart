@@ -266,24 +266,8 @@ class AiAgentService {
     } catch (_) {}
   }
 
-  double parseArabicNumber(String text) {
-    String clean = text.toLowerCase();
-
-    // فحص الكلمات من قاموس الأرقام اليمنية
-    for (var entry in YemeniDictionary.yemeniNumberWords.entries) {
-      if (clean.contains(entry.key)) {
-        return entry.value;
-      }
-    }
-
-    RegExp regex = RegExp(r'(\d[\d,\.]*)');
-    var match = regex.firstMatch(clean);
-    if (match != null) {
-      String numStr = match.group(0)!.replaceAll(',', '');
-      return double.tryParse(numStr) ?? 0.0;
-    }
-    return 0.0;
-  }
+  double parseArabicNumber(String text) =>
+      AiAgentParser.parseArabicNumber(text);
 
   /// يرسل النص إلى Gemini عند توفر مفتاح وشبكة، ويرجع null كي يعمل fallback المحلي.
   Future<Map<String, dynamic>?> processWithGemini(String voiceText) {
@@ -304,6 +288,7 @@ class AiAgentService {
         lower.contains("تقرير اليوم") ||
         lower.contains("المصروفات اليومية") ||
         lower.contains("صرفت اليوم") ||
+        lower.contains("مصروف اليوم") ||
         lower.contains("كم مصروف اليوم")) {
       double total = await _db.getTodayTotal('مصروف');
       String msg =
@@ -338,9 +323,12 @@ class AiAgentService {
     }
 
     // Gemini هو المسار الأساسي عند وجود مفتاح واتصال. عند أي فشل يعود المحلل المحلي.
+    final localResult = parseCommandToJson(voiceText);
     final geminiResult = await processWithGemini(voiceText);
-    final Map<String, dynamic> jsonResult =
-        geminiResult ?? parseCommandToJson(voiceText);
+    final Map<String, dynamic> jsonResult = {
+      ...localResult,
+      if (geminiResult != null) ...geminiResult,
+    };
 
     final geminiType = jsonResult['type']?.toString();
     final legacyType = jsonResult['النوع']?.toString();
@@ -388,11 +376,14 @@ class AiAgentService {
       _ => '$canonicalType $description',
     };
 
-    await _db.addTransaction(
-      type: canonicalType,
-      amount: amount,
-      description: '$description (النص الصوتي: $voiceText)',
-    );
+    final structuredCommand = <String, dynamic>{
+      ...jsonResult,
+      'type': canonicalType,
+      'amount': amount,
+      'description': description,
+      'date': jsonResult['date'] ?? DateTime.now().toIso8601String(),
+    };
+    await _db.saveParsedCommand(structuredCommand);
 
     final todayTotal = await _db.getTodayTotal(canonicalType);
     final formattedAmount = amount.toStringAsFixed(0);

@@ -344,3 +344,14 @@
 - [x] إضافة FakeVoskEngine قابل للتحكم في init/start/stop/failure
 - [x] إضافة fake_async لاختبار Timer وحالات التسجيل والمهلات
 - [x] تشغيل التحليل والاختبارات والتغطية ودفع التغييرات؛ 72 اختباراً ناجحاً، VoskService 64.86%، الإجمالي 77.99%
+
+
+## Smart Accountant v3.0.0 — full Arabic voice accounting
+- [x] محلل عربي أوفلاين للأوامر المركبة والوصف والأشخاص والأصناف
+- [x] دعم الأرقام العربية والرقمية والفواصل والكمية × سعر الوحدة
+- [x] إنشاء جداول expenses وpurchases وsales وdebt_for_me وdebt_on_me وinventory
+- [x] ربط AiAgentService بالحفظ المتخصص مع استمرار سجل transactions القديم
+- [x] دعم أوامر التقارير والبحث أوفلاين
+- [x] اختبارات الأمثلة التسعة والتخزين والحسابات والبيانات غير الصالحة
+- [x] flutter analyze و82 اختباراً ناجحاً وcoverage 80.58%
+- [x] بناء APK v3.0.0 النهائي والتحقق من CI؛ app-release.apk بحجم 92.2MB
