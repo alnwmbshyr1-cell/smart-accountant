@@ -1,0 +1,59 @@
+global:
+  resolve_timeout: 5m
+  # Mount the Slack incoming webhook URL as a secret file. Never inline it.
+  slack_api_url_file: /etc/alertmanager/secrets/slack_webhook_url
+
+route:
+  receiver: smart-accountant-slack
+  group_by: [alertname, job, severity]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    - matchers:
+        - severity="critical"
+      receiver: smart-accountant-critical
+      continue: true
+    - matchers:
+        - severity="high"
+      receiver: smart-accountant-ops-webhook
+      continue: true
+
+receivers:
+  - name: smart-accountant-slack
+    slack_configs:
+      - channel: "#smart-accountant-alerts"
+        send_resolved: true
+        title: "[{{ .Status | toUpper }}] Smart Accountant alert"
+        text: >-
+          {{ range .Alerts }}
+          *{{ .Labels.alertname }}* ({{ .Labels.severity }})
+          {{ .Annotations.summary }}
+          {{ .Annotations.description }}
+          {{ if .Annotations.runbook }}Runbook: {{ .Annotations.runbook }}{{ end }}
+          {{ end }}
+
+  - name: smart-accountant-critical
+    slack_configs:
+      - channel: "#smart-accountant-critical"
+        send_resolved: true
+        title: "[{{ .Status | toUpper }}] CRITICAL Smart Accountant alert"
+        text: >-
+          {{ range .Alerts }}
+          *{{ .Labels.alertname }}*
+          {{ .Annotations.summary }}
+          {{ .Annotations.description }}
+          {{ if .Annotations.runbook }}Runbook: {{ .Annotations.runbook }}{{ end }}
+          {{ end }}
+
+  - name: smart-accountant-ops-webhook
+    webhook_configs:
+      - url_file: /etc/alertmanager/secrets/ops_webhook_url
+        send_resolved: true
+
+inhibit_rules:
+  - source_matchers:
+      - alertname="SmartAccountantBackendDown"
+    target_matchers:
+      - severity=~"warning|high"
+    equal: [job]

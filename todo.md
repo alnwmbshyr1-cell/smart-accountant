@@ -428,3 +428,11 @@
 - [x] إضافة اختبارات بنية JSON ووجود PromQL للمقاييس الفعلية
 - [x] تحديث المهارة بدليل الاستيراد والتشغيل والتنبيهات
 - [x] توثيق أن التحقق النهائي يحتاج Grafana/Prometheus فعليين أو promtool في CI
+
+
+## Prometheus 5xx Alert Delivery
+- [x] إضافة قاعدة 5xx قابلة للتهيئة مع threshold وfor وlabels مستقرة
+- [x] إضافة إعداد Alertmanager للتجميع والكبت وإرسال Slack أو Webhook
+- [x] إبقاء Webhook وSlack secrets خارج Git باستخدام secret files أو environment
+- [x] إضافة اختبار بنية قواعد التنبيه وإجراء dry-run آمن؛ الاختبار المحلي يثبت العقد، وamtool يحتاج CI/staging
+- [x] تحديث مهارة Smart Accountant بتشغيل Alertmanager واختبار recovery
