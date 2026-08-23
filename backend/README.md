@@ -55,6 +55,17 @@ curl -X POST http://localhost:8080/v1/accounting/parse \
 
 استجابة 401 تعني أن التوكن مفقود أو غير صالح، و400 تعني أن الطلب غير صحيح، و422 تعني أن مخرجات النموذج لم تجتز Zod، و502/504 تعني فشل Gemini أو انتهاء مهلة الخادم.
 
+## اختبارات التكامل
+
+اختبر عقدة Supabase وEndpoint محلياً دون أسرار إنتاجية:
+
+```bash
+npx vitest run test/auth.test.ts test/supabase_integration.test.ts
+npm run build
+```
+
+ينشئ `supabase_integration.test.ts` مفتاح RSA وJWKS محلياً، يوقع JWT تجريبياً، يرسل طلب HTTP إلى Express عبر منفذ محلي، ويعترض طلب Gemini فقط. لذلك يغطي التوقيع والمصادقة وZod وعقدة HTTP دون الاعتماد على Supabase أو Gemini الحقيقيين. نفّذ اختبار staging منفصلاً على جهاز Android باستخدام Supabase SDK وHTTPS، ولا تضع access token أو service-role key في GitHub Actions.
+
 ## Flutter
 
 شغّل:

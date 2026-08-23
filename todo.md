@@ -395,3 +395,11 @@
 - [x] إضافة نمط token loader قابل للحقن مع إعادة محاولة واحدة بعد 401؛ ربط SDK الفعلي يبقى اختيارياً لكل المشروع
 - [x] منع إرسال GEMINI_API_KEY من Flutter والحفاظ على fallback المحلي عند فشل الشبكة أو المصادقة
 - [x] إضافة اختبارات عميل تغطي Authorization وغياب التوكن و401 مع refresh وtimeout وfallback؛ 5 اختبارات ناجحة
+
+
+## Supabase End-to-End Integration Tests
+- [x] إضافة اختبار تكامل HTTP يمرر Supabase JWT إلى Backend ثم يعيد JSON محاسبياً مطابقاً للمخطط
+- [x] تشغيل Backend محلياً مع JWKS RSA مزيف وGemini fake دون أسرار إنتاجية
+- [x] اختبار رفض توكن Supabase المنتهي قبل استدعاء Gemini؛ تغطية انقطاع الشبكة و401 وإعادة التوكن موجودة في اختبارات العميل
+- [x] توثيق تشغيل الاختبار في CI وAndroid staging دون تضمين مفاتيح حقيقية
+- [x] تحديث مهارة Smart Accountant بسير عمل اختبارات التكامل والـfixtures
