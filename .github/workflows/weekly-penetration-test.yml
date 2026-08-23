@@ -66,9 +66,27 @@ jobs:
             --markdown-output weekly-pentest/digest.md \
             --json-output weekly-pentest/digest.json
 
+      - name: Detect security regressions
+        id: regression
+        if: always() && steps.digest.outcome == 'success'
+        env:
+          SECURITY_PENTEST_PREVIOUS_URL: ${{ secrets.SECURITY_PENTEST_PREVIOUS_URL }}
+          SECURITY_PENTEST_EXPORT_TOKEN: ${{ secrets.SECURITY_PENTEST_EXPORT_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$SECURITY_PENTEST_PREVIOUS_URL"
+          python3 tooling/detect_security_regressions.py \
+            --current weekly-pentest/digest.json \
+            --previous-url "$SECURITY_PENTEST_PREVIOUS_URL" \
+            --token "$SECURITY_PENTEST_EXPORT_TOKEN" \
+            --markdown-output weekly-pentest/regressions.md \
+            --json-output weekly-pentest/regressions.json
+
       - name: Publish summary
         if: always()
-        run: cat weekly-pentest/digest.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+        run: |
+          cat weekly-pentest/digest.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+          cat weekly-pentest/regressions.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
 
       - name: Notify Slack security channel
         if: always() && steps.digest.outcome == 'success'
@@ -76,7 +94,7 @@ jobs:
           SECURITY_SLACK_WEBHOOK_URL: ${{ secrets.SECURITY_SLACK_WEBHOOK_URL }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_WORKFLOW: ${{ github.workflow }}
-        run: python3 tooling/weekly_pentest_digest.py --input weekly-pentest/pentest-report.md --markdown-output /tmp/digest.md --json-output /tmp/digest.json --send-slack
+        run: python3 tooling/weekly_pentest_digest.py --summary-json weekly-pentest/digest.json --markdown-output /tmp/digest.md --json-output /tmp/digest.json --regression-json weekly-pentest/regressions.json --send-slack
 
       - name: Enforce PenTest result
         if: always() && steps.pentest.outcome != 'success'
