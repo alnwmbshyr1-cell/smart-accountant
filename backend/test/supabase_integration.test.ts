@@ -121,4 +121,31 @@ describe('Supabase authenticated Flutter-to-Backend contract', () => {
     expect(response.status).toBe(401);
     expect(receivedPrompt).toBe(before);
   });
+
+  it('emits a correlation id and safe metrics without logging secrets', async () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      const response = await realFetch(`${baseUrl}/v1/accounting/parse`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-request-id': 'integration-request-1',
+        },
+        body: JSON.stringify({ text: 'نص محاسبي سري لا يجب تسجيله' }),
+      });
+      const metricsResponse = await realFetch(`${baseUrl}/metrics`);
+      const metrics = await metricsResponse.json() as Record<string, number>;
+      const serializedLogs = [...info.mock.calls, ...warn.mock.calls].flat().join(' ');
+
+      expect(response.status).toBe(401);
+      expect(response.headers.get('x-request-id')).toBe('integration-request-1');
+      expect(metrics.auth_failures_total).toBeGreaterThan(0);
+      expect(serializedLogs).not.toContain('Bearer');
+      expect(serializedLogs).not.toContain('نص محاسبي سري');
+    } finally {
+      info.mockRestore();
+      warn.mockRestore();
+    }
+  });
 });

@@ -4,6 +4,7 @@ import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import { z } from 'zod';
 import { createJwtVerifier, requireJwt } from './auth.js';
+import { getMetrics, logEvent, requestObservability, recordGeminiFailure } from './observability.js';
 
 const app = express();
 const port = Number(process.env.PORT ?? 8080);
@@ -87,12 +88,20 @@ async function callGemini(text: string, signal: AbortSignal): Promise<unknown> {
 }
 
 app.disable('x-powered-by');
+app.use(requestObservability);
 app.use(helmet());
 app.use(express.json({ limit: '16kb' }));
 app.use(cors({ origin: allowedOrigins.length > 0 ? allowedOrigins : false, methods: ['POST', 'GET'] }));
 app.use(rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false }));
 
-app.get('/healthz', (_req, res) => res.json({ ok: true }));
+app.get('/healthz', (_req, res) => res.json({ ok: true, service: 'smart-accountant-gemini-backend' }));
+
+app.get('/readyz', (_req, res) => {
+  const ready = Boolean(geminiKey) && Boolean(process.env.AUTH_PROVIDER);
+  return res.status(ready ? 200 : 503).json({ ready });
+});
+
+app.get('/metrics', (_req, res) => res.json(getMetrics()));
 
 app.post('/v1/accounting/parse', requireJwt(jwtVerifier), async (req, res) => {
   const request = commandRequestSchema.safeParse(req.body);
@@ -107,7 +116,11 @@ app.post('/v1/accounting/parse', requireJwt(jwtVerifier), async (req, res) => {
     return res.json(result.data);
   } catch (error) {
     const name = error instanceof Error ? error.name : 'unknown';
-    console.error('gemini_parse_failed', name);
+    recordGeminiFailure();
+    logEvent('error', 'gemini_parse_failed', {
+      request_id: req.requestId ?? null,
+      error_type: name,
+    });
     return res.status(name === 'AbortError' ? 504 : 502).json({
       error: name === 'AbortError' ? 'backend_timeout_or_network' : 'gemini_upstream_error',
     });

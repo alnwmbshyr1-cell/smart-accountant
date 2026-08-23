@@ -2,6 +2,7 @@ import { getApps, initializeApp, applicationDefault, cert } from 'firebase-admin
 import { getAuth } from 'firebase-admin/auth';
 import { createRemoteJWKSet, jwtVerify, type JWTPayload } from 'jose';
 import type { NextFunction, Request, Response } from 'express';
+import { logEvent, recordAuthFailure } from './observability.js';
 
 export type AuthenticatedUser = {
   uid: string;
@@ -97,13 +98,23 @@ export function createJwtVerifier(): JwtVerifier {
 export function requireJwt(verify: JwtVerifier) {
   return async (req: Request, res: Response, next: NextFunction) => {
     const token = bearerToken(req);
-    if (!token) return res.status(401).json({ error: 'missing_or_malformed_token' });
+    if (!token) {
+      recordAuthFailure();
+      logEvent('warn', 'jwt_missing_or_malformed', {
+        request_id: req.requestId ?? null,
+      });
+      return res.status(401).json({ error: 'missing_or_malformed_token' });
+    }
     try {
       req.authenticatedUser = await verify(token);
       return next();
     } catch (error) {
       const name = error instanceof Error ? error.name : 'unknown';
-      console.warn('jwt_rejected', name);
+      recordAuthFailure();
+      logEvent('warn', 'jwt_rejected', {
+        request_id: req.requestId ?? null,
+        error_type: name,
+      });
       return res.status(401).json({ error: 'invalid_or_expired_token' });
     }
   };
