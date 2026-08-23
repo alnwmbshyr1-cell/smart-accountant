@@ -593,3 +593,10 @@
 - [x] إضافة runner يثبت pending ثم firing ثم resolved عبر Prometheus وAlertmanager
 - [x] التحقق من وصول payload إلى مستقبل Alertmanager المحلي
 - [x] تحديث المهارة والتوثيق ثم التحقق والدفع
+
+
+## Alertmanager Webhook Security Testing
+- [x] إضافة اختبارات منع تسريب Authorization وtokens وcookies وبيانات payload
+- [x] اختبار تنقيح السجلات ورفض الحقول الحساسة عبر مستقبل Webhook
+- [x] ربط فحص التسريب بالـCI دون طباعة الأسرار
+- [x] تحديث المهارة والتوثيق ثم التحقق والدفع

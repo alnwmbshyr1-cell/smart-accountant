@@ -130,6 +130,12 @@ jobs:
             --entrypoint /bin/promtool \
             prom/prometheus:v3.5.0 \
             test rules ops/prometheus/tests/smart-accountant-alerts.test.yml
+      - name: Run Alertmanager Webhook data-leak tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest tooling/test_webhook_receiver_security.py
+
       - name: Validate Alertmanager configuration with amtool
         shell: bash
         run: |
