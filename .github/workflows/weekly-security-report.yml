@@ -56,6 +56,18 @@ jobs:
             --workflow-url "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
             --send-slack
 
+      - name: Notify workflow failure immediately
+        if: failure()
+        continue-on-error: true
+        env:
+          SECURITY_SLACK_WEBHOOK_URL: ${{ secrets.SECURITY_SLACK_WEBHOOK_URL }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_WORKFLOW: ${{ github.workflow }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_JOB: ${{ github.job }}
+          WORKFLOW_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: python3 tooling/notify_workflow_failure.py
+
       - name: Upload weekly report
         if: always()
         uses: actions/upload-artifact@v4
