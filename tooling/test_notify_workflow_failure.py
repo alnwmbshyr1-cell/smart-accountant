@@ -35,6 +35,31 @@ class WorkflowFailureAlertTests(unittest.TestCase):
         self.assertIn("actions/runs/123", payload["text"])
         self.assertNotIn("Authorization", json.dumps(payload))
 
+    def test_k6_payload_has_safe_kind_and_bounded_summary(self):
+        payload = notify_workflow_failure.build_payload({
+            "GITHUB_REPOSITORY": "org/repo",
+            "GITHUB_RUN_ID": "456",
+            "SECURITY_FAILURE_KIND": "k6_load_test",
+            "SECURITY_FAILURE_TITLE": "Smart Accountant load test failed",
+            "SECURITY_FAILURE_SUMMARY": "Inspect thresholds and Redis saturation.",
+        })
+        self.assertEqual(payload["event"], "k6_load_test_failed")
+        self.assertIn("load test failed", payload["text"])
+        self.assertIn("Redis saturation", payload["text"])
+        self.assertLessEqual(len(payload["text"]), 1000)
+
+    def test_failure_payload_does_not_include_attempt_or_secret_material(self):
+        payload = notify_workflow_failure.build_payload({
+            "GITHUB_REPOSITORY": "org/repo",
+            "GITHUB_RUN_ID": "456",
+            "GITHUB_RUN_ATTEMPT": "7",
+            "SECURITY_FAILURE_SUMMARY": "Bearer should-never-appear",
+        })
+        encoded = json.dumps(payload)
+        self.assertNotIn("Bearer", encoded)
+        self.assertNotIn("should-never-appear", encoded)
+        self.assertNotIn("GITHUB_RUN_ATTEMPT", encoded)
+
     def test_send_failure_alert_passes_idempotency_header(self):
         captured = {}
         with patch.object(notify_workflow_failure, "post_json", side_effect=lambda url, payload, **kwargs: captured.update({"url": url, "payload": payload, "headers": kwargs["headers"]})):

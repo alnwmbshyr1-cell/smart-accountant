@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import sys
 from typing import Any
 
@@ -29,13 +30,17 @@ def build_payload(env: dict[str, str] | None = None) -> dict[str, Any]:
     repository = values.get("GITHUB_REPOSITORY", "local")
     run_id = values.get("GITHUB_RUN_ID", "local-run")
     url = values.get("WORKFLOW_URL", f"https://github.com/{repository}/actions/runs/{run_id}")
+    kind = values.get("SECURITY_FAILURE_KIND", "weekly_security_workflow")[:80]
+    title = values.get("SECURITY_FAILURE_TITLE", "Security workflow failed")[:120]
+    summary = values.get("SECURITY_FAILURE_SUMMARY", "Inspect the failed step before rerunning.")[:240]
+    summary = re.sub(r"(?i)(bearer\s+|token|api[_-]?key|secret|password)[^\s,;]*", "[REDACTED]", summary)
     return {
-        "text": "*Smart Accountant: weekly security workflow failed*\n"
+        "text": f"*Smart Accountant: {title}*\n"
         f"Repository: `{repository}`\n"
         f"Run: `{run_id}`\n"
         f"<{url}|Open workflow run>\n"
-        "Inspect the failed step and rerun only after the root cause is understood.",
-        "event": "weekly_security_workflow_failed",
+        f"{summary}",
+        "event": f"{kind}_failed",
         "idempotency_key": key,
         "repository": repository,
         "run_id": run_id,

@@ -101,6 +101,17 @@ jobs:
             --json-output load-results/load-report.json
           cat load-results/load-report.json >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Notify load-test failure
+        if: failure()
+        continue-on-error: true
+        env:
+          SECURITY_SLACK_WEBHOOK_URL: ${{ secrets.SECURITY_SLACK_WEBHOOK_URL }}
+          SECURITY_FAILURE_KIND: k6_load_test
+          SECURITY_FAILURE_TITLE: Smart Accountant load test failed
+          SECURITY_FAILURE_SUMMARY: Inspect k6 thresholds, dropped iterations, gateway metrics, and Redis saturation before rerunning.
+          WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: python tooling/notify_workflow_failure.py
+
       - name: Upload performance reports
         if: always()
         uses: actions/upload-artifact@v4
