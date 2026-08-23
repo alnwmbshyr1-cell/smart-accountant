@@ -1,0 +1,8 @@
+# Official JWT authentication findings
+
+- Firebase Admin SDK verifies Firebase client ID tokens with `verifyIdToken()`, returns decoded claims including `uid`, and requires a service account/project ID. Verification checks signature, format, expiry, issuer, audience, subject, and issued-at; token revocation requires an additional revocation check. Source: https://firebase.google.com/docs/auth/admin/verify-id-tokens
+- Firebase client sends the ID token to the custom backend over HTTPS after sign-in. The backend must verify it rather than trusting a client-provided uid. Source: https://firebase.google.com/docs/auth/admin/verify-id-tokens
+- Supabase access tokens are JWTs carrying claims such as `iss`, `exp`, `sub`, and `role`. Supabase recommends `supabase.auth.getClaims()` or a high-quality JWT library rather than implementing signature verification manually. Source: https://supabase.com/docs/guides/auth/jwts
+- For Supabase asymmetric signing keys, the project JWKS endpoint is `https://<project-id>.supabase.co/auth/v1/.well-known/jwks.json`; verify with `jose`/`jwtVerify` and do not cache the JWKS longer than needed for rotation/revocation. Source: https://supabase.com/docs/guides/auth/jwts
+- Supabase legacy shared JWT secret is no longer recommended; asymmetric signing keys provide local, fast verification and safer rotation. Source: https://supabase.com/docs/guides/auth/signing-keys
+- Supabase Auth guidance treats `auth.users.id`/`sub` as the stable identity boundary, and authorization must not depend on email or editable metadata. Source: /home/ubuntu/skills/supabase-backend-operations/SKILL.md

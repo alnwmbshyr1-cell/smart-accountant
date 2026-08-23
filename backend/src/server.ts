@@ -3,6 +3,7 @@ import express, { type NextFunction, type Request, type Response } from 'express
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import { z } from 'zod';
+import { createJwtVerifier, requireJwt } from './auth.js';
 
 const app = express();
 const port = Number(process.env.PORT ?? 8080);
@@ -29,15 +30,7 @@ export const accountingResultSchema = z.object({
   quantity: z.number().finite().positive(),
 });
 
-export function authenticateUser(req: Request, res: Response, next: NextFunction) {
-  const authorization = req.header('authorization') ?? '';
-  if (!authorization.startsWith(BearerPrefix) || authorization.length <= BearerPrefix.length) {
-    return res.status(401).json({ error: 'unauthorized' });
-  }
-  return next();
-}
-
-const BearerPrefix = 'Bearer ';
+const jwtVerifier = createJwtVerifier();
 
 export function buildPrompt(text: string): string {
   return `
@@ -101,7 +94,7 @@ app.use(rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHe
 
 app.get('/healthz', (_req, res) => res.json({ ok: true }));
 
-app.post('/v1/accounting/parse', authenticateUser, async (req, res) => {
+app.post('/v1/accounting/parse', requireJwt(jwtVerifier), async (req, res) => {
   const request = commandRequestSchema.safeParse(req.body);
   if (!request.success) return res.status(400).json({ error: 'invalid_request' });
 
