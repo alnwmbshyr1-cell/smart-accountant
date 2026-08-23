@@ -4,7 +4,7 @@
 
 ## التشغيل
 
-من هذا المجلد:
+من مجلد `backend/ops/alertmanager`:
 
 ```bash
 chmod +x lab/run_lab.sh
@@ -53,7 +53,7 @@ printf '%s\n' 'https://hooks.slack.com/services/REDACTED' > lab/secrets/slack_we
 لا تستخدم القيمة أعلاه حرفياً. استخدم Slack Incoming Webhook حقيقياً من مساحة اختبار منفصلة. أنشئ override خاصاً خارج Git يوجه route إلى `optional-slack`، ثم شغل:
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.slack.override.yml up -d
+docker compose -f docker-compose.yml -f lab/docker-compose.slack.override.yml up -d
 ```
 
 احذف secret file بعد الاختبار، وراجع قناة Slack للتأكد من firing ثم resolved. لا تجعل هذا المختبر يستهدف قناة إنتاجية.
@@ -78,6 +78,6 @@ docker run --rm -v "$PWD:/work:ro" -w /work prom/prometheus:v3.5.0 promtool chec
 ## تنظيف
 
 ```bash
-docker compose down
+docker compose -f docker-compose.yml down
 rm -rf lab/prometheus-data lab/alertmanager-data lab/received/*.json
 ```
