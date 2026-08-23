@@ -505,3 +505,10 @@
 - [x] ربط security-notify في GitHub Actions بـSecurity Gateway عبر HTTPS وIdempotency-Key
 - [x] توثيق أسرار الشهادات وإجراءات الدوران وعدم تخزينها في Git أو artifacts
 - [x] إضافة اختبارات الإعدادات والتوثيق والتحقق ثم دفع التعديل
+
+
+## Security Gateway Reusable Skill and Live Integration Test
+- [x] إضافة runner لاختبار البوابة وRedis داخل Docker Compose
+- [x] إثبات 202 للطلب الأول و200 duplicate للطلب الثاني عبر Redis الفعلي
+- [x] تحديث مهارة skill-creator بمسار الاختبار الحي وmTLS وRedis TLS
+- [x] تشغيل التحقق وتوثيق قيود Docker ثم دفع التعديل
