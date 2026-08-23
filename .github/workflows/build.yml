@@ -127,8 +127,9 @@ jobs:
           docker run --rm \
             --volume "$GITHUB_WORKSPACE/backend:/work:ro" \
             --workdir /work \
+            --entrypoint /bin/promtool \
             prom/prometheus:v3.5.0 \
-            promtool test rules ops/prometheus/tests/smart-accountant-alerts.test.yml
+            test rules ops/prometheus/tests/smart-accountant-alerts.test.yml
       - name: Validate Alertmanager configuration with amtool
         shell: bash
         run: |
@@ -136,8 +137,21 @@ jobs:
           docker run --rm \
             --volume "$GITHUB_WORKSPACE/backend:/work:ro" \
             --workdir /work \
+            --entrypoint /bin/amtool \
             prom/alertmanager:v0.28.1 \
-            amtool check-config ops/alertmanager/alertmanager.yml
+            check-config ops/alertmanager/alertmanager.yml
+      - name: Validate local Compose topology
+        run: docker compose -f backend/ops/alertmanager/docker-compose.yml config --quiet
+      - name: Upload observability CI inputs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: observability-ci-inputs-${{ github.sha }}
+          path: |
+            backend/ops/prometheus/
+            backend/ops/alertmanager/
+          if-no-files-found: warn
+          retention-days: 7
   security:
     name: Security scanning
     runs-on: ubuntu-latest

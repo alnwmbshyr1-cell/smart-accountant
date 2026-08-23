@@ -69,8 +69,8 @@ promtool check rules /etc/prometheus/tests/local-5xx-alerts.yml
 داخل Compose يمكن تنفيذها عبر:
 
 ```bash
-docker run --rm -v "$PWD:/work:ro" -w /work prom/alertmanager:v0.28.1 amtool check-config ops/alertmanager/lab/alertmanager.local.yml
-docker run --rm -v "$PWD:/work:ro" -w /work prom/prometheus:v3.5.0 promtool check rules ops/alertmanager/lab/local-5xx-alerts.yml
+docker run --rm -v "$PWD:/work:ro" -w /work --entrypoint /bin/amtool prom/alertmanager:v0.28.1 check-config ops/alertmanager/lab/alertmanager.local.yml
+docker run --rm -v "$PWD:/work:ro" -w /work --entrypoint /bin/promtool prom/prometheus:v3.5.0 check rules ops/alertmanager/lab/local-5xx-alerts.yml
 ```
 
 المستقبل المحلي يحفظ نسخة منقحة من payload: status وlabels وannotations فقط. لا ترسل النص المحاسبي أو Authorization أو أي مفتاح إلى هذه الخدمة.

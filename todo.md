@@ -452,3 +452,11 @@
 - [x] إضافة إعداد Slack اختياري عبر secret file أو environment خارج Git
 - [x] إضافة سكربت تشغيل وتنظيف واختبار health وalert delivery
 - [x] تحديث المهارة بتركيب المختبر وقيود عدم استخدام Slack الإنتاجي محلياً
+
+
+## Alertmanager CI/CD Automation
+- [x] إضافة job مستقل لفحص promtool داخل GitHub Actions بنسخة Prometheus مثبتة
+- [x] إضافة فحص amtool لإعداد Alertmanager داخل نفس المسار
+- [x] ربط job المراقبة ببوابة الجودة لمنع Build وRelease عند الفشل
+- [x] حفظ تقارير وإخفاقات المراقبة كـCI artifacts دون أسرار
+- [x] تحديث المهارة بدليل تشغيل CI وقيود Docker والـsecrets
