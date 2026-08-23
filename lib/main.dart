@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/intl.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
+import 'notification_service.dart';
 
 const orange = Color(0xFFD97706);
 const green = Color(0xFF16A34A);
@@ -11,6 +12,7 @@ const cream = Color(0xFFFFFBF5);
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await MaqaniNotificationService.instance.initialize();
   final db = LivestockDb();
   await db.open();
   runApp(LivestockApp(db: db));

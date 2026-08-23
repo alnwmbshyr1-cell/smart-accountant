@@ -16,6 +16,37 @@
 
 تحتوي شاشة `تقارير الأرباح والمصاريف` على ملخص الإيرادات والمصاريف وصافي الربح أو الخسارة، وقائمة آخر الحركات المالية، مع نموذج لإضافة إيراد أو مصروف وتصنيفه وقيمته وملاحظاته. تمت إضافة جدولَي `health_records` و`financial_entries` إلى SQLite مع ترقية تلقائية من إصدار القاعدة السابق.
 
+## التنبيهات والإشعارات
+
+تمت إضافة `lib/notification_service.dart` باستخدام إشعارات Android المحلية، لذلك لا يحتاج التذكير إلى خادم أو اتصال دائم بالإنترنت. عند تشغيل التطبيق تُطلب صلاحية الإشعارات وصلاحية المنبهات الدقيقة على Android. لجدولة تذكير تطعيم بعد حفظ الموعد، استدعِ:
+
+```dart
+await MaqaniNotificationService.instance.scheduleVaccinationReminder(
+  id: animalId,
+  animalNumber: '102',
+  date: vaccinationDate,
+);
+```
+
+ولجدولة متابعة حالة مرضية:
+
+```dart
+await MaqaniNotificationService.instance.scheduleHealthFollowUp(
+  id: healthRecordId,
+  animalNumber: '102',
+  condition: 'التهاب العين',
+  date: followUpDate,
+);
+```
+
+تتم إعادة جدولة الإشعارات بعد إعادة تشغيل الجهاز عبر `RECEIVE_BOOT_COMPLETED`. قد تمنع بعض هواتف Android المعدّلة عمل التنبيهات في الخلفية؛ عند حدوث ذلك يجب السماح للتطبيق بالعمل تلقائياً من إعدادات البطارية.
+
+## بناء APK عبر GitHub Actions
+
+تمت إضافة الملف `.github/workflows/android-apk.yml`. يعمل تلقائياً عند الدفع إلى `main` أو إنشاء Pull Request، ويمكن تشغيله يدوياً من تبويب **Actions** عبر اختيار `Build Maqani Android APK` ثم `Run workflow`. بعد انتهاء المهمة، افتح قسم **Artifacts** وحمّل `maqani-apks-...`، وستجد نسخ APK منفصلة لمعمارية `armeabi-v7a` و`arm64-v8a` و`x86_64`.
+
+النسخة الحالية تبني APK غير موقّع بتوقيع release مخصص؛ قبل النشر في Google Play يجب إضافة keystore مشفّر إلى GitHub Secrets واستخدامه في خطوة توقيع منفصلة، وعدم وضع ملف keystore أو كلمات المرور داخل المستودع.
+
 ## التشغيل
 
 بعد تثبيت Flutter وAndroid SDK، نفّذ:
