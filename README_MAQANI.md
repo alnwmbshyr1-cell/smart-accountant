@@ -108,6 +108,27 @@ io.maqani.app://auth-callback/
 
 وقد أُضيف `intent-filter` المقابل إلى `android/app/src/main/AndroidManifest.xml`. يجب إبقاء **Confirm email** مفعلاً من إعدادات مزود Email في Supabase إذا كان التطبيق يتطلب تأكيد البريد قبل السماح بالدخول. يعتمد هذا التدفق على واجهات `resetPasswordForEmail` و`updateUser` وحدث `onAuthStateChange` الرسمية [5] [6] [7].
 
+## تسجيل الدخول عبر Google وApple
+
+أضيفت أزرار **Google** و**Apple** إلى شاشة الدخول باستخدام `signInWithOAuth`. يستخدم التطبيق تدفق المتصفح الآمن ثم يعود إلى Android عبر الرابط العميق:
+
+```dart
+await Supabase.instance.client.auth.signInWithOAuth(
+  OAuthProvider.google,
+  redirectTo: 'io.maqani.app://auth-callback/',
+);
+```
+
+يجب إضافة الرابط نفسه في Supabase Dashboard ضمن **Authentication > URL Configuration > Redirect URLs**. كما يجب ضبط callback الخاص بـ Supabase في كل مزود OAuth على الشكل التالي:
+
+```text
+https://YOUR_PROJECT_REF.supabase.co/auth/v1/callback
+```
+
+في Google Cloud Console أنشئ OAuth Client من نوع Web application، ثم ضع Client ID وClient Secret في **Authentication > Providers > Google** داخل Supabase. وفي Apple Developer أنشئ Service ID وKey وفعّل Sign in with Apple، ثم أدخل Team ID وKey ID وملف المفتاح الخاص ضمن مزود Apple في Supabase. لا تضع Client Secret أو ملف Apple `.p8` داخل تطبيق Android أو المستودع؛ هذه القيم تُدار داخل Supabase فقط [8] [9].
+
+على Android تمت إضافة `intent-filter` للمخطط `io.maqani.app` والمضيف `auth-callback`. عند نجاح OAuth يستقبل `AuthGate` تغيّر الجلسة عبر `onAuthStateChange` ويعرض التطبيق مباشرة. إذا كان الحساب الاجتماعي جديداً، ينشئ Trigger المستخدم صف `profiles` المرتبط بـ `auth.users.id`، ولا ينبغي استخدام اسم البريد أو بيانات الملف الشخصي كبديل عن هوية المستخدم في سياسات RLS.
+
 ## التشغيل
 
 بعد تثبيت Flutter وAndroid SDK، نفّذ:
@@ -134,3 +155,5 @@ flutter build apk --debug
 [5]: https://supabase.com/docs/reference/dart/auth-resetpasswordforemail "Supabase Dart resetPasswordForEmail"
 [6]: https://supabase.com/docs/reference/dart/auth-updateuser "Supabase Dart updateUser"
 [7]: https://supabase.com/docs/guides/auth/passwords "Supabase Password-based Auth"
+[8]: https://supabase.com/docs/guides/auth/social-login/auth-google "Supabase Login with Google"
+[9]: https://supabase.com/docs/guides/auth/social-login/auth-apple "Supabase Login with Apple"
