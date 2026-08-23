@@ -1,0 +1,39 @@
+name: Authorized Gateway Medium Stress Test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  medium-stress:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: staging-security-test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install k6
+        uses: grafana/setup-k6-action@v1
+      - name: Run bounded medium stress test
+        env:
+          PENTEST_ENV: staging
+          STRESS_TEST_URL: ${{ secrets.STAGING_HEALTH_URL }}
+          TEST_ID: medium-${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          test -n "$STRESS_TEST_URL"
+          case "$STRESS_TEST_URL" in
+            https://*) ;;
+            *) echo 'STRESS_TEST_URL must use HTTPS' >&2; exit 1 ;;
+          esac
+          k6 run \
+            --summary-export=stress-results.json \
+            tooling/security_gateway_stress_test.js
+      - name: Upload stress result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gateway-medium-stress-${{ github.run_id }}
+          path: stress-results.json
+          retention-days: 7
