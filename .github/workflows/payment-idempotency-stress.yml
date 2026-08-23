@@ -1,0 +1,75 @@
+name: Authorized Payment Idempotency Stress Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: 'Test profile: smoke or medium'
+        required: true
+        default: smoke
+        type: choice
+        options:
+          - smoke
+          - medium
+
+permissions:
+  contents: read
+
+jobs:
+  payment-idempotency:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    environment: staging-security-test
+    env:
+      PAYMENT_URL: ${{ secrets.STAGING_PAYMENT_URL }}
+      PAYMENT_TOKEN: ${{ secrets.STAGING_PAYMENT_TEST_TOKEN }}
+      TEST_ID: payment-${{ github.run_id }}
+      MAX_RETRIES: '2'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install k6
+        uses: grafana/setup-k6-action@v1
+
+      - name: Validate protected staging target
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$PAYMENT_URL"
+          test -n "$PAYMENT_TOKEN"
+          case "$PAYMENT_URL" in
+            https://*) ;;
+            *) echo 'PAYMENT_URL must use HTTPS' >&2; exit 1 ;;
+          esac
+          if [[ "$PAYMENT_URL" == *production* || "$PAYMENT_URL" == *prod.* ]]; then
+            echo 'Production payment targets are forbidden' >&2
+            exit 1
+          fi
+
+      - name: Run payment idempotency smoke test
+        if: inputs.profile == 'smoke'
+        shell: bash
+        run: |
+          set -euo pipefail
+          k6 run \
+            --summary-export=payment-stress-results.json \
+            --vus 2 \
+            --duration 20s \
+            tooling/payment_idempotency_stress_test.js
+
+      - name: Run payment idempotency medium profile
+        if: inputs.profile == 'medium'
+        shell: bash
+        run: |
+          set -euo pipefail
+          k6 run \
+            --summary-export=payment-stress-results.json \
+            tooling/payment_idempotency_stress_test.js
+
+      - name: Upload redacted result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: payment-idempotency-stress-${{ github.run_id }}
+          path: payment-stress-results.json
+          retention-days: 7

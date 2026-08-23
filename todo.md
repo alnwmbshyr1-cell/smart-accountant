@@ -643,3 +643,10 @@
 - [x] التحقق من 2xx/409/429/5xx وعدم تكرار الأثر المالي
 - [x] توثيق وتحسين Node.js Event Loop وقياس event-loop lag
 - [x] إضافة اختبارات الحواجز وتحديث المهارة والتحقق والدفع
+
+
+## CI Idempotency and Database Transient Errors
+- [x] إضافة Workflow لاختبارات الدفع وIdempotency في staging المحمي
+- [x] إضافة quality gates للتكرار والـretry والـ429/5xx مع artifacts منقحة
+- [x] توثيق استراتيجية Deadlock وserialization failures مع retry محدود وآمن
+- [x] إضافة اختبارات الحواجز والتحقق وتحديث المهارة ثم الدفع
