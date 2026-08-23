@@ -27,6 +27,7 @@ run_fast() {
 run_integration() {
   step "Integration tests"
   flutter test test/integration_workflow_test.dart --concurrency=1
+  flutter test test/integration_full_workflow_test.dart --concurrency=1
 }
 
 run_coverage() {
@@ -35,6 +36,7 @@ run_coverage() {
   test -s coverage/lcov.info || fail "coverage/lcov.info is missing or empty"
   step "HTML coverage report"
   python3 tooling/generate_coverage_report.py
+  python3 tooling/report_coverage.py > coverage/coverage_by_file.txt
   step "Coverage gate"
   awk -F: '
     /^LF:/ { total += $2 }
@@ -74,10 +76,12 @@ run_security() {
 
 case "$MODE" in
   fast) run_fast ;;
+  integration) run_integration ;;
+  coverage) run_coverage ;;
   full) run_fast; run_integration; run_coverage; run_performance ;;
   security) run_security ;;
   *)
-    echo "Usage: $0 {fast|full|security}" >&2
+    echo "Usage: $0 {fast|integration|coverage|full|security}" >&2
     exit 2
     ;;
 esac

@@ -7,6 +7,8 @@ on:
       - 'v*'
   pull_request:
     branches: [main]
+  schedule:
+    - cron: '0 2 * * 0'
   workflow_dispatch:
 
 permissions:
@@ -17,6 +19,10 @@ env:
   FLUTTER_VERSION: '3.27.1'
   PUB_CACHE: ${{ github.workspace }}/.pub-cache
   GRADLE_OPTS: -Dorg.gradle.daemon=false -Dorg.gradle.parallel=false -Dorg.gradle.caching=true
+
+concurrency:
+  group: smart-accountant-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   fast:
@@ -34,11 +40,37 @@ jobs:
           cache: true
       - name: Install dependencies
         run: flutter pub get
-      - name: Run fast checks
+      - name: Run formatting, analysis, unit, and widget checks
         run: ./tooling/ci_local.sh fast
 
-  full:
-    name: Full tests, integration, and coverage
+  integration:
+    name: Integration tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - name: Install dependencies
+        run: flutter pub get
+      - name: Run integration workflows
+        run: ./tooling/ci_local.sh integration
+      - name: Upload integration logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-logs-${{ github.sha }}
+          path: /tmp/*.log
+          if-no-files-found: ignore
+          retention-days: 14
+
+  coverage:
+    name: Full coverage
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -52,8 +84,21 @@ jobs:
           cache: true
       - name: Install dependencies
         run: flutter pub get
-      - name: Run full checks
-        run: ./tooling/ci_local.sh full
+      - name: Run full suite and coverage gate
+        run: ./tooling/ci_local.sh coverage
+      - name: Generate coverage summary
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -s coverage/lcov.info ]; then
+            python3 tooling/report_coverage.py | tee /tmp/coverage-summary.txt
+            {
+              echo '## Coverage summary'
+              echo
+              sed -n '/^TOTAL/,$p' /tmp/coverage-summary.txt
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
       - name: Upload coverage artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -62,8 +107,10 @@ jobs:
           path: |
             coverage/lcov.info
             coverage/html/
-            performance/
+            coverage/coverage_by_file.txt
+            coverage/coverage_report_ar.md
           if-no-files-found: warn
+          retention-days: 14
 
   security:
     name: Security scanning
@@ -101,21 +148,24 @@ jobs:
   quality:
     name: Quality gate
     runs-on: ubuntu-latest
-    needs: [fast, full, security]
+    needs: [fast, integration, coverage, security]
     if: always()
     steps:
       - name: Require all quality jobs to pass
         env:
           FAST_RESULT: ${{ needs.fast.result }}
-          FULL_RESULT: ${{ needs.full.result }}
+          INTEGRATION_RESULT: ${{ needs.integration.result }}
+          COVERAGE_RESULT: ${{ needs.coverage.result }}
           SECURITY_RESULT: ${{ needs.security.result }}
         run: |
           set -euo pipefail
           echo "fast=${FAST_RESULT}"
-          echo "full=${FULL_RESULT}"
+          echo "integration=${INTEGRATION_RESULT}"
+          echo "coverage=${COVERAGE_RESULT}"
           echo "security=${SECURITY_RESULT}"
           test "$FAST_RESULT" = success
-          test "$FULL_RESULT" = success
+          test "$INTEGRATION_RESULT" = success
+          test "$COVERAGE_RESULT" = success
           test "$SECURITY_RESULT" = success
 
   build:
@@ -165,4 +215,4 @@ jobs:
           files: build/app/outputs/flutter-apk/app-release.apk
           body: |
             ## المحاسب الصوتي - ${{ github.ref_name }}
-            تم اجتياز الفحوصات السريعة والكاملة والأمنية قبل بناء APK.
+            تم اجتياز fast وintegration وcoverage وsecurity قبل بناء APK.
