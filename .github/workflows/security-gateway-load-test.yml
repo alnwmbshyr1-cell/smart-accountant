@@ -1,0 +1,111 @@
+name: Security Gateway Load Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: 'smoke or load; load requires explicit staging approval'
+        required: true
+        default: smoke
+        type: choice
+        options: [smoke, load]
+
+permissions:
+  contents: read
+
+jobs:
+  load-test:
+    name: k6 gateway load test
+    runs-on: ubuntu-24.04
+    environment: staging-load-test
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup k6
+        uses: grafana/setup-k6-action@v1
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install report dependency
+        run: python -m pip install --disable-pip-version-check --no-input matplotlib
+
+      - name: Prepare staging TLS files
+        env:
+          CA_B64: ${{ secrets.STAGING_GATEWAY_CA_B64 }}
+          CLIENT_CERT_B64: ${{ secrets.STAGING_GATEWAY_CLIENT_CERT_B64 }}
+          CLIENT_KEY_B64: ${{ secrets.STAGING_GATEWAY_CLIENT_KEY_B64 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/gateway-tls"
+          if [[ -n "$CA_B64" ]]; then printf '%s' "$CA_B64" | base64 --decode > "$RUNNER_TEMP/gateway-tls/ca.crt"; fi
+          if [[ -n "$CLIENT_CERT_B64" ]]; then printf '%s' "$CLIENT_CERT_B64" | base64 --decode > "$RUNNER_TEMP/gateway-tls/client.crt"; fi
+          if [[ -n "$CLIENT_KEY_B64" ]]; then
+            printf '%s' "$CLIENT_KEY_B64" | base64 --decode > "$RUNNER_TEMP/gateway-tls/client.key"
+            chmod 600 "$RUNNER_TEMP/gateway-tls/client.key"
+          fi
+
+      - name: Run smoke profile
+        if: inputs.profile == 'smoke'
+        env:
+          GATEWAY_URL: ${{ secrets.STAGING_GATEWAY_URL }}
+          GATEWAY_INGRESS_TOKEN: ${{ secrets.STAGING_GATEWAY_INGRESS_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p load-results
+          k6 run \
+            -e GATEWAY_URL="$GATEWAY_URL" \
+            -e GATEWAY_INGRESS_TOKEN="$GATEWAY_INGRESS_TOKEN" \
+            -e UNIQUE_RPS=5 -e DUPLICATE_RPS=1 \
+            --summary-export=load-results/load-results.json \
+            tooling/security_gateway_load_test.js
+
+      - name: Run approved load profile
+        if: inputs.profile == 'load'
+        env:
+          GATEWAY_URL: ${{ secrets.STAGING_GATEWAY_URL }}
+          GATEWAY_INGRESS_TOKEN: ${{ secrets.STAGING_GATEWAY_INGRESS_TOKEN }}
+          LOAD_TEST_APPROVED: ${{ secrets.SECURITY_GATEWAY_LOAD_TEST_APPROVED }}
+          GATEWAY_CLIENT_CERT: ${{ runner.temp }}/gateway-tls/client.crt
+          GATEWAY_CLIENT_KEY: ${{ runner.temp }}/gateway-tls/client.key
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$LOAD_TEST_APPROVED" = true
+          test -n "$GATEWAY_URL"
+          test -n "$GATEWAY_INGRESS_TOKEN"
+          mkdir -p load-results
+          args=(
+            -e "GATEWAY_URL=$GATEWAY_URL"
+            -e "GATEWAY_INGRESS_TOKEN=$GATEWAY_INGRESS_TOKEN"
+            -e UNIQUE_RPS=950
+            -e DUPLICATE_RPS=50
+            --summary-export=load-results/load-results.json
+          )
+          if [[ -s "$RUNNER_TEMP/gateway-tls/ca.crt" ]]; then args+=(--tls-ca-cert="$RUNNER_TEMP/gateway-tls/ca.crt"); fi
+          if [[ ! -s "$RUNNER_TEMP/gateway-tls/client.crt" || ! -s "$RUNNER_TEMP/gateway-tls/client.key" ]]; then unset GATEWAY_CLIENT_CERT GATEWAY_CLIENT_KEY; fi
+          k6 run "${args[@]}" tooling/security_gateway_load_test.js
+
+      - name: Generate visual performance report
+        if: always() && hashFiles('load-results/load-results.json') != ''
+        run: |
+          python tooling/analyze_k6_results.py \
+            load-results/load-results.json \
+            --html-output load-results/load-report.html \
+            --json-output load-results/load-report.json
+          cat load-results/load-report.json >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload performance reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-gateway-load-report-${{ github.run_id }}
+          path: load-results/
+          if-no-files-found: warn
+          retention-days: 14

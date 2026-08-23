@@ -552,3 +552,10 @@
 - [x] توليد رسوم للكمون ومعدل الطلبات والأخطاء ونتائج thresholds
 - [x] إضافة اختبارات صيغ k6 الأساسية والحالات الناقصة
 - [x] تحديث المهارة والتحقق ثم دفع التعديل
+
+
+## k6 CI Visual Performance Report
+- [x] إضافة Workflow staging لتشغيل k6 وتصدير load-results.json
+- [x] تشغيل محلل Python وتوليد HTML/JSON وGITHUB_STEP_SUMMARY
+- [x] فرض thresholds ورفع التقارير كـartifacts دون أسرار
+- [x] تحديث المهارة والتوثيق والاختبارات ثم دفع التعديل
