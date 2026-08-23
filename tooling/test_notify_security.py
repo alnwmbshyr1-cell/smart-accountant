@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).parent))
 import notify_security
+import security_gateway
 
 
 class NotifySecurityTests(unittest.TestCase):
@@ -123,6 +124,62 @@ class NotifySecurityTests(unittest.TestCase):
         self.assertEqual(len(result), 1)
         self.assertFalse(result[0].sent)
         self.assertEqual(result[0].error, "OSError")
+
+    def test_redis_claim_accepts_first_key_and_rejects_duplicate(self):
+        class FakeRedis:
+            def __init__(self):
+                self.values = {}
+            def set(self, name, value, *, nx, ex):
+                if nx and name in self.values:
+                    return False
+                self.values[name] = value
+                return True
+            def get(self, name):
+                return self.values.get(name)
+            def delete(self, name):
+                return int(self.values.pop(name, None) is not None)
+            def expire(self, name, time):
+                return name in self.values
+
+        redis = FakeRedis()
+        self.assertTrue(security_gateway.claim(redis, "sa-" + "a" * 32, "owner-1", 86400))
+        self.assertFalse(security_gateway.claim(redis, "sa-" + "a" * 32, "owner-2", 86400))
+
+    def test_redis_release_only_removes_key_for_same_owner(self):
+        class FakeRedis:
+            def __init__(self):
+                self.values = {}
+            def set(self, name, value, *, nx, ex):
+                if nx and name in self.values:
+                    return False
+                self.values[name] = value
+                return True
+            def get(self, name):
+                return self.values.get(name)
+            def delete(self, name):
+                return int(self.values.pop(name, None) is not None)
+            def expire(self, name, time):
+                return name in self.values
+
+        redis = FakeRedis()
+        key = "sa-" + "b" * 32
+        security_gateway.claim(redis, key, "owner-1", 86400)
+        security_gateway.release_if_owner(redis, key, "owner-2")
+        self.assertEqual(redis.get("security-alert:" + key), "owner-1")
+        security_gateway.release_if_owner(redis, key, "owner-1")
+        self.assertIsNone(redis.get("security-alert:" + key))
+
+    def test_gateway_payload_requires_matching_header_and_bounded_key(self):
+        payload = {
+            "event": "critical_security_findings",
+            "idempotency_key": "sa-" + "c" * 32,
+            "total_critical": 1,
+            "findings": [],
+        }
+        validated = security_gateway.validate_payload(payload, payload["idempotency_key"])
+        self.assertEqual(validated["idempotency_key"], payload["idempotency_key"])
+        with self.assertRaises(ValueError):
+            security_gateway.validate_payload(payload, "sa-" + "d" * 32)
 
     def test_webhook_sends_idempotency_header_and_payload_field(self):
         captured = {}

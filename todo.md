@@ -491,3 +491,10 @@
 - [x] إضافة مفتاح idempotency ثابت لكل Workflow/finding/channel
 - [x] اختبار 429 و5xx وإعادة المحاولة وعدم تكرار الرسائل
 - [x] تحديث Workflow والمهارة والتوثيق ثم دفع التعديل
+
+
+## Local HTTPS Redis Idempotency Gateway
+- [x] إضافة بوابة محلية تستقبل التنبيه وتطبق Redis SET NX مع TTL
+- [x] إضافة تحقق من Idempotency-Key وحماية endpoint وforwarding اختياري
+- [x] إضافة اختبارات مفتاح ثابت ومختلف ومنع المكرر في test_notify_security.py
+- [x] إضافة Compose وHTTPS local certificate instructions وتحديث المهارة (فحص Compose يتطلب Docker Compose غير المتاح في الساندبوكس)
