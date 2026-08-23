@@ -119,35 +119,291 @@ class _HomeShellState extends State<HomeShell> {
 }
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key, required this.db, required this.refresh, required this.onAdd, required this.onHealth, required this.onReports});
-  final LivestockDb db; final ValueNotifier<int> refresh; final VoidCallback onAdd; final VoidCallback onHealth; final VoidCallback onReports;
-  @override State<HomeScreen> createState() => _HomeScreenState();
+  const HomeScreen({
+    super.key,
+    required this.db,
+    required this.refresh,
+    required this.onAdd,
+    required this.onHealth,
+    required this.onReports,
+  });
+
+  final LivestockDb db;
+  final ValueNotifier<int> refresh;
+  final VoidCallback onAdd;
+  final VoidCallback onHealth;
+  final VoidCallback onReports;
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
 }
+
 class _HomeScreenState extends State<HomeScreen> {
-  List<Map<String, dynamic>> animals = []; String query = ''; String filter = 'الكل';
-  @override void initState() { super.initState(); load(); widget.refresh.addListener(load); }
-  @override void dispose() { widget.refresh.removeListener(load); super.dispose(); }
-  Future<void> load() async { final rows = await widget.db.animals(); if (mounted) setState(() => animals = rows); }
-  List<Map<String, dynamic>> get shown => animals.where((a) { final matchesQuery = query.isEmpty || '${a['number']}'.contains(query) || '${a['animal_type']}'.contains(query); final matchesFilter = filter == 'الكل' || (filter == 'الذكور' && a['gender'] == 'ذكر') || (filter == 'الاناث' && a['gender'] == 'انثى') || a['animal_type'] == filter || (filter == 'الدافع' && a['tag_color'] == 'أخضر'); return matchesQuery && matchesFilter; }).toList();
-  @override Widget build(BuildContext context) => SafeArea(child: RefreshIndicator(onRefresh: load, child: ListView(padding: const EdgeInsets.fromLTRB(18, 18, 18, 30), children: [
-    Row(children: [const AnimalLogo(size: 46), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('اهلا بك', style: TextStyle(color: Colors.grey.shade600)), const Text('السارحات بارك', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: ink))])), IconButton(onPressed: AuthConfig.isConfigured ? () async { await Supabase.instance.client.auth.signOut(); } : null, tooltip: 'تسجيل الخروج', icon: const Icon(Icons.logout, color: orange))]),
-    const SizedBox(height: 20), Container(padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: orange.withOpacity(.10), borderRadius: BorderRadius.circular(16), border: Border.all(color: orange.withOpacity(.22))), child: const Row(children: [Icon(Icons.info_outline, color: orange), SizedBox(width: 10), Expanded(child: Text('يرجي اضافة ايصال التحويل ليتم تفعيل الحساب', style: TextStyle(color: ink, fontWeight: FontWeight.w600)))])),
-    const SizedBox(height: 18), const Text('التصنيف', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900)), const SizedBox(height: 10), StatsCard(animals: animals),
-    const SizedBox(height: 14), SizedBox(height: 52, child: FilledButton.icon(onPressed: widget.onAdd, style: FilledButton.styleFrom(backgroundColor: green, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))), icon: const Icon(Icons.add), label: const Text('اضافة رأس', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)))),
-    const SizedBox(height: 14), Row(children: [QuickAction(icon: Icons.vaccines_outlined, label: 'التطعيم', color: green, onTap: () {}), const SizedBox(width: 10), QuickAction(icon: Icons.medical_information_outlined, label: 'السجل المرضي', color: orange, onTap: widget.onHealth), const SizedBox(width: 10), QuickAction(icon: Icons.payments_outlined, label: 'التقارير المالية', color: Colors.blueGrey, onTap: widget.onReports)]),
-    const SizedBox(height: 20), TextField(onChanged: (v) => setState(() => query = v), decoration: const InputDecoration(hintText: 'ابحث عن ...', prefixIcon: Icon(Icons.search))),
-    const SizedBox(height: 12), SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: ['الكل', 'نجدي', 'حري', 'الذكور', 'الاناث', 'الدافع'].map((f) => Padding(padding: const EdgeInsets.only(left: 8), child: ChoiceChip(label: Text(f), selected: filter == f, selectedColor: orange.withOpacity(.18), onSelected: (_) => setState(() => filter = f))).toList())),
-    const SizedBox(height: 18), if (shown.isEmpty) const EmptyState() else GridView.builder(shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), itemCount: shown.length, gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: 1.25), itemBuilder: (_, i) => AnimalCard(animal: shown[i])),
-  ])));
+  List<Map<String, dynamic>> animals = [];
+  String query = '';
+  String filter = 'الكل';
+
+  @override
+  void initState() {
+    super.initState();
+    load();
+    widget.refresh.addListener(load);
+  }
+
+  @override
+  void dispose() {
+    widget.refresh.removeListener(load);
+    super.dispose();
+  }
+
+  Future<void> load() async {
+    final rows = await widget.db.animals();
+    if (mounted) setState(() => animals = rows);
+  }
+
+  List<Map<String, dynamic>> get shown {
+    return animals.where((a) {
+      final matchesQuery = query.isEmpty ||
+          '${a['number']}'.contains(query) ||
+          '${a['animal_type']}'.contains(query);
+      final matchesFilter = filter == 'الكل' ||
+          (filter == 'الذكور' && a['gender'] == 'ذكر') ||
+          (filter == 'الاناث' && a['gender'] == 'انثى') ||
+          a['animal_type'] == filter ||
+          (filter == 'الدافع' && a['tag_color'] == 'أخضر');
+      return matchesQuery && matchesFilter;
+    }).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: RefreshIndicator(
+        onRefresh: load,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(18, 18, 18, 30),
+          children: [
+            Row(
+              children: [
+                const AnimalLogo(size: 46),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('اهلا بك', style: TextStyle(color: Colors.grey.shade600)),
+                      const Text('السارحات بارك', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: ink)),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  onPressed: AuthConfig.isConfigured
+                      ? () async => Supabase.instance.client.auth.signOut()
+                      : null,
+                  tooltip: 'تسجيل الخروج',
+                  icon: const Icon(Icons.logout, color: orange),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: orange.withOpacity(.10),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: orange.withOpacity(.22)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.info_outline, color: orange),
+                  SizedBox(width: 10),
+                  Expanded(child: Text('يرجي اضافة ايصال التحويل ليتم تفعيل الحساب', style: TextStyle(color: ink, fontWeight: FontWeight.w600))),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
+            const Text('التصنيف', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 10),
+            StatsCard(animals: animals),
+            const SizedBox(height: 14),
+            SizedBox(
+              height: 52,
+              child: FilledButton.icon(
+                onPressed: widget.onAdd,
+                style: FilledButton.styleFrom(backgroundColor: green, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
+                icon: const Icon(Icons.add),
+                label: const Text('اضافة رأس', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                QuickAction(icon: Icons.vaccines_outlined, label: 'التطعيم', color: green, onTap: () {}),
+                const SizedBox(width: 10),
+                QuickAction(icon: Icons.medical_information_outlined, label: 'السجل المرضي', color: orange, onTap: widget.onHealth),
+                const SizedBox(width: 10),
+                QuickAction(icon: Icons.payments_outlined, label: 'التقارير المالية', color: Colors.blueGrey, onTap: widget.onReports),
+              ],
+            ),
+            const SizedBox(height: 20),
+            TextField(
+              onChanged: (v) => setState(() => query = v),
+              decoration: const InputDecoration(hintText: 'ابحث عن ...', prefixIcon: Icon(Icons.search)),
+            ),
+            const SizedBox(height: 12),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: ['الكل', 'نجدي', 'حري', 'الذكور', 'الاناث', 'الدافع']
+                    .map(
+                      (f) => Padding(
+                        padding: const EdgeInsets.only(left: 8),
+                        child: ChoiceChip(
+                          label: Text(f),
+                          selected: filter == f,
+                          selectedColor: orange.withOpacity(.18),
+                          onSelected: (_) => setState(() => filter = f),
+                        ),
+                      ),
+                    )
+                    .toList(),
+              ),
+            ),
+            const SizedBox(height: 18),
+            if (shown.isEmpty)
+              const EmptyState()
+            else
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: shown.length,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                  childAspectRatio: 1.25,
+                ),
+                itemBuilder: (_, i) => AnimalCard(animal: shown[i]),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
-class StatsCard extends StatelessWidget { const StatsCard({super.key, required this.animals}); final List<Map<String, dynamic>> animals;
-  @override Widget build(BuildContext context) { final types = ['معز', 'حري', 'نجدي']; return Card(elevation: 0, color: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)), child: Padding(padding: const EdgeInsets.all(14), child: Column(children: [Container(padding: const EdgeInsets.symmetric(vertical: 10), decoration: BoxDecoration(color: orange.withOpacity(.08), borderRadius: BorderRadius.circular(10)), child: const Row(children: [Expanded(child: Text('النوع', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold))), Expanded(child: Text('ذكور', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold))), Expanded(child: Text('اناث', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold)))])), ...types.map((type) { final males = animals.where((a) => a['animal_type'] == type && a['gender'] == 'ذكر').length; final females = animals.where((a) => a['animal_type'] == type && a['gender'] == 'انثى').length; return Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Row(children: [Expanded(child: Text(type, textAlign: TextAlign.center)), Expanded(child: Text('$males', textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold))), Expanded(child: Text('$females', textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold)))])); })]))); }
+class StatsCard extends StatelessWidget {
+  const StatsCard({super.key, required this.animals});
+  final List<Map<String, dynamic>> animals;
+
+  @override
+  Widget build(BuildContext context) {
+    const types = ['معز', 'حري', 'نجدي'];
+    return Card(
+      elevation: 0,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              decoration: BoxDecoration(color: orange.withOpacity(.08), borderRadius: BorderRadius.circular(10)),
+              child: const Row(
+                children: [
+                  Expanded(child: Text('النوع', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold))),
+                  Expanded(child: Text('ذكور', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold))),
+                  Expanded(child: Text('اناث', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold))),
+                ],
+              ),
+            ),
+            ...types.map((type) {
+              final males = animals.where((a) => a['animal_type'] == type && a['gender'] == 'ذكر').length;
+              final females = animals.where((a) => a['animal_type'] == type && a['gender'] == 'انثى').length;
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Row(
+                  children: [
+                    Expanded(child: Text(type, textAlign: TextAlign.center)),
+                    Expanded(child: Text('$males', textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold))),
+                    Expanded(child: Text('$females', textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold))),
+                  ],
+                ),
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
-class QuickAction extends StatelessWidget { const QuickAction({super.key, required this.icon, required this.label, required this.color, required this.onTap}); final IconData icon; final String label; final Color color; final VoidCallback onTap; @override Widget build(BuildContext context) => Expanded(child: InkWell(onTap: onTap, borderRadius: BorderRadius.circular(14), child: Container(padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 3), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: Colors.black12)), child: Column(children: [Icon(icon, color: color), const SizedBox(height: 5), Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold))]))); }
+class QuickAction extends StatelessWidget {
+  const QuickAction({super.key, required this.icon, required this.label, required this.color, required this.onTap});
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
 
-class AnimalCard extends StatelessWidget { const AnimalCard({super.key, required this.animal}); final Map<String, dynamic> animal; @override Widget build(BuildContext context) { final isMale = animal['gender'] == 'ذكر'; final color = animal['tag_color'] == 'أخضر' ? green : animal['tag_color'] == 'أزرق' ? Colors.blue : orange; return Card(elevation: 0, color: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(17)), child: Padding(padding: const EdgeInsets.all(12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Row(children: [Container(width: 12, height: 12, decoration: BoxDecoration(color: color, shape: BoxShape.circle)), const Spacer(), Icon(isMale ? Icons.male : Icons.female, color: isMale ? Colors.blue : Colors.pink, size: 20)]), const Spacer(), Text('${animal['number']}', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: ink)), Text('${animal['animal_type']} • ${animal['gender']}', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),]))); }
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 3),
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: Colors.black12)),
+          child: Column(
+            children: [
+              Icon(icon, color: color),
+              const SizedBox(height: 5),
+              Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class AnimalCard extends StatelessWidget {
+  const AnimalCard({super.key, required this.animal});
+  final Map<String, dynamic> animal;
+
+  @override
+  Widget build(BuildContext context) {
+    final isMale = animal['gender'] == 'ذكر';
+    final color = animal['tag_color'] == 'أخضر'
+        ? green
+        : animal['tag_color'] == 'أزرق'
+            ? Colors.blue
+            : orange;
+    return Card(
+      elevation: 0,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(17)),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(width: 12, height: 12, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+                const Spacer(),
+                Icon(isMale ? Icons.male : Icons.female, color: isMale ? Colors.blue : Colors.pink, size: 20),
+              ],
+            ),
+            const Spacer(),
+            Text('${animal['number']}', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: ink)),
+            Text('${animal['animal_type']} • ${animal['gender']}', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class AddAnimalScreen extends StatefulWidget { const AddAnimalScreen({super.key, required this.db, this.onSaved}); final LivestockDb db; final VoidCallback? onSaved; @override State<AddAnimalScreen> createState() => _AddAnimalScreenState(); }
@@ -158,29 +414,490 @@ class _AddAnimalScreenState extends State<AddAnimalScreen> { final form = Global
 
 class TagsScreen extends StatefulWidget { const TagsScreen({super.key, required this.db, required this.refresh}); final LivestockDb db; final ValueNotifier<int> refresh; @override State<TagsScreen> createState() => _TagsScreenState(); }
 class _TagsScreenState extends State<TagsScreen> { String color = 'برتقالي', query = ''; int count = 1; List<Map<String, dynamic>> tags = []; @override void initState() { super.initState(); load(); } Future<void> load() async { final x = await widget.db.tags(); if (mounted) setState(() => tags = x); } Future<void> add() async { final max = tags.length + 1; for (var i = 0; i < count; i++) await widget.db.addTag('$color-${max + i}', color); await load(); widget.refresh.value++; } @override Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('اضف ارقام', style: TextStyle(fontWeight: FontWeight.w900))), body: ListView(padding: const EdgeInsets.all(18), children: [Row(children: [Expanded(child: DropdownButtonFormField<String>(value: color, decoration: const InputDecoration(labelText: 'اختر اللون'), items: ['برتقالي', 'أخضر', 'أزرق'].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(), onChanged: (v) => setState(() => color = v!))), const SizedBox(width: 10), SizedBox(width: 90, child: TextFormField(initialValue: '1', keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'العدد'), onChanged: (v) => count = int.tryParse(v) ?? 1)), const SizedBox(width: 10), IconButton.filled(onPressed: add, style: IconButton.styleFrom(backgroundColor: green), icon: const Icon(Icons.add))]), const SizedBox(height: 24), const Text('الارقام المتاحة', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)), const SizedBox(height: 12), TextField(onChanged: (v) => setState(() => query = v), decoration: const InputDecoration(hintText: 'ابحث عن رقم', prefixIcon: Icon(Icons.search))), const SizedBox(height: 15), Wrap(spacing: 10, runSpacing: 10, children: tags.where((t) => '${t['number']}'.contains(query)).map((t) { final c = t['color'] == 'أخضر' ? green : t['color'] == 'أزرق' ? Colors.blue : orange; return Container(width: 105, padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12), decoration: BoxDecoration(color: c.withOpacity(.12), borderRadius: BorderRadius.circular(14)), child: Row(children: [Container(width: 9, height: 9, decoration: BoxDecoration(color: c, shape: BoxShape.circle)), const SizedBox(width: 7), Expanded(child: Text('${t['number']}', style: const TextStyle(fontWeight: FontWeight.bold))), InkWell(onTap: () async { await widget.db.deleteTag(t['id'] as int); load(); }, child: const Icon(Icons.delete_outline, size: 18, color: Colors.grey))])); }).toList())])); }
+
+class VaccinationScreen extends StatefulWidget {
+  const VaccinationScreen({super.key, required this.db});
+  final LivestockDb db;
+
+  @override
+  State<VaccinationScreen> createState() => _VaccinationScreenState();
 }
 
-class VaccinationScreen extends StatefulWidget { const VaccinationScreen({super.key, required this.db}); final LivestockDb db; @override State<VaccinationScreen> createState() => _VaccinationScreenState(); }
 class _VaccinationScreenState extends State<VaccinationScreen> {
   Future<void> scheduleFor(Map<String, dynamic> animal) async {
-    final date = await showDatePicker(context: context, firstDate: DateTime.now(), lastDate: DateTime.now().add(const Duration(days: 3650)), initialDate: DateTime.now().add(const Duration(days: 7)), locale: const Locale('ar', 'SA'));
+    final date = await showDatePicker(
+      context: context,
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 3650)),
+      initialDate: DateTime.now().add(const Duration(days: 7)),
+      locale: const Locale('ar', 'SA'),
+    );
     if (date == null) return;
     final scheduled = DateTime(date.year, date.month, date.day, 9);
-    await MaqaniNotificationService.instance.scheduleVaccinationReminder(id: (animal['id'] as int) + 100000, animalNumber: '${animal['number']}', date: scheduled);
-    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تم جدولة تطعيم الرأس ${animal['number']} في ${DateFormat('dd/MM/yyyy').format(scheduled)}'), backgroundColor: green));
+    await MaqaniNotificationService.instance.scheduleVaccinationReminder(
+      id: (animal['id'] as int) + 100000,
+      animalNumber: '${animal['number']}',
+      date: scheduled,
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'تم جدولة تطعيم الرأس ${animal['number']} في ${DateFormat('dd/MM/yyyy').format(scheduled)}',
+        ),
+        backgroundColor: green,
+      ),
+    );
   }
-  @override Widget build(BuildContext context) => FutureBuilder<List<Map<String, dynamic>>>(future: widget.db.animals(), builder: (_, snap) { final animals = snap.data ?? []; return Scaffold(appBar: AppBar(title: const Text('التطعيم', style: TextStyle(fontWeight: FontWeight.w900))), body: ListView(padding: const EdgeInsets.all(18), children: [Container(height: 92, padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: green.withOpacity(.1), borderRadius: BorderRadius.circular(18)), child: Row(children: [const Icon(Icons.calendar_month, color: green, size: 34), const SizedBox(width: 12), Expanded(child: Text(DateFormat('MMMM yyyy', 'ar').format(DateTime.now()), style: const TextStyle(fontSize: 19, fontWeight: FontWeight.bold))), const Icon(Icons.notifications_active_outlined, color: green)])), const SizedBox(height: 18), const Text('اختر الرأس وحدد موعد التذكير', style: TextStyle(color: Colors.grey)), const SizedBox(height: 12), ...animals.take(8).map((a) => Card(elevation: 0, color: Colors.white, child: ListTile(leading: CircleAvatar(backgroundColor: a['tag_color'] == 'أخضر' ? green : orange, radius: 8), title: Text('${a['number']}', style: const TextStyle(fontWeight: FontWeight.bold)), subtitle: Text('${a['animal_type']} • ${a['gender']}'), trailing: IconButton(onPressed: () => scheduleFor(a), icon: const Icon(Icons.event_available, color: green))))).toList()]); });
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: widget.db.animals(),
+      builder: (_, snap) {
+        final animals = snap.data ?? <Map<String, dynamic>>[];
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text('التطعيم', style: TextStyle(fontWeight: FontWeight.w900)),
+          ),
+          body: ListView(
+            padding: const EdgeInsets.all(18),
+            children: [
+              Container(
+                height: 92,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: green.withOpacity(.1),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.calendar_month, color: green, size: 34),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        DateFormat('MMMM yyyy', 'ar').format(DateTime.now()),
+                        style: const TextStyle(fontSize: 19, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    const Icon(Icons.notifications_active_outlined, color: green),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+              const Text('اختر الرأس وحدد موعد التذكير', style: TextStyle(color: Colors.grey)),
+              const SizedBox(height: 12),
+              ...animals.take(8).map(
+                    (a) => Card(
+                      elevation: 0,
+                      color: Colors.white,
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: a['tag_color'] == 'أخضر' ? green : orange,
+                          radius: 8,
+                        ),
+                        title: Text('${a['number']}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                        subtitle: Text('${a['animal_type']} • ${a['gender']}'),
+                        trailing: IconButton(
+                          onPressed: () => scheduleFor(a),
+                          icon: const Icon(Icons.event_available, color: green),
+                        ),
+                      ),
+                    ),
+                  )
+                  .toList(),
+            ],
+          ),
+        );
+      },
+    );
+  }
 }
 
-class HealthRecordScreen extends StatefulWidget { const HealthRecordScreen({super.key, required this.db}); final LivestockDb db; @override State<HealthRecordScreen> createState() => _HealthRecordScreenState(); }
-class _HealthRecordScreenState extends State<HealthRecordScreen> { List<Map<String, dynamic>> records = []; String filter = 'الكل'; @override void initState() { super.initState(); load(); } Future<void> load() async { final rows = await widget.db.healthRecords(); if (mounted) setState(() => records = rows); } Future<void> addRecord() async { final animal = TextEditingController(); final condition = TextEditingController(); final notes = TextEditingController(); String status = 'قيد المتابعة'; DateTime? followUp; final saved = await showDialog<bool>(context: context, builder: (_) => StatefulBuilder(builder: (context, setDialog) => AlertDialog(title: const Text('إضافة حالة صحية'), content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [TextField(controller: animal, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'رقم الرأس')), const SizedBox(height: 10), TextField(controller: condition, decoration: const InputDecoration(labelText: 'الحالة / التشخيص')), const SizedBox(height: 10), DropdownButtonFormField<String>(value: status, decoration: const InputDecoration(labelText: 'الحالة'), items: ['قيد المتابعة', 'تماثل للشفاء', 'مغلقة'].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(), onChanged: (v) => setDialog(() => status = v!)), const SizedBox(height: 10), InkWell(onTap: () async { final d = await showDatePicker(context: context, firstDate: DateTime.now(), lastDate: DateTime.now().add(const Duration(days: 3650)), initialDate: DateTime.now().add(const Duration(days: 7)), locale: const Locale('ar', 'SA')); if (d != null) setDialog(() => followUp = DateTime(d.year, d.month, d.day, 9)); }, child: InputDecorator(decoration: const InputDecoration(labelText: 'موعد المتابعة (اختياري)', suffixIcon: Icon(Icons.notifications_active_outlined)), child: Text(followUp == null ? 'اختر تاريخ التذكير' : DateFormat('dd/MM/yyyy').format(followUp!)))), const SizedBox(height: 10), TextField(controller: notes, maxLines: 2, decoration: const InputDecoration(labelText: 'ملاحظات'))])), actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('إلغاء')), FilledButton(onPressed: () async { if (animal.text.trim().isNotEmpty && condition.text.trim().isNotEmpty) { final recordId = await widget.db.addHealthRecord(animal.text.trim(), condition.text.trim(), notes.text.trim(), status); if (followUp != null) { await MaqaniNotificationService.instance.scheduleHealthFollowUp(id: recordId + 200000, animalNumber: animal.text.trim(), condition: condition.text.trim(), date: followUp!); } Navigator.pop(context, true); } }, child: const Text('حفظ'))])); if (saved == true) load(); }
-  @override Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('السجل المرضي', style: TextStyle(fontWeight: FontWeight.w900)), actions: [IconButton(onPressed: addRecord, icon: const Icon(Icons.add_circle, color: orange))]), floatingActionButton: FloatingActionButton.extended(onPressed: addRecord, backgroundColor: orange, icon: const Icon(Icons.add), label: const Text('حالة جديدة')), body: ListView(padding: const EdgeInsets.all(18), children: [Container(padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: orange.withOpacity(.10), borderRadius: BorderRadius.circular(18)), child: Row(children: [const Icon(Icons.health_and_safety, color: orange, size: 32), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const Text('متابعة صحة القطيع', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)), Text('${records.length} حالات مسجلة', style: TextStyle(color: Colors.grey.shade700))]))])), const SizedBox(height: 16), SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: ['الكل', 'قيد المتابعة', 'تماثل للشفاء', 'مغلقة'].map((f) => Padding(padding: const EdgeInsets.only(left: 8), child: ChoiceChip(label: Text(f), selected: filter == f, selectedColor: orange.withOpacity(.18), onSelected: (_) => setState(() => filter = f))).toList())), const SizedBox(height: 14), ...records.where((r) => filter == 'الكل' || r['status'] == filter).map((r) => Card(elevation: 0, color: Colors.white, margin: const EdgeInsets.only(bottom: 10), child: ListTile(leading: CircleAvatar(backgroundColor: r['status'] == 'مغلقة' ? green.withOpacity(.15) : orange.withOpacity(.15), child: Icon(r['status'] == 'مغلقة' ? Icons.check : Icons.medical_services_outlined, color: r['status'] == 'مغلقة' ? green : orange)), title: Text('الرأس رقم ${r['animal_number']}', style: const TextStyle(fontWeight: FontWeight.bold)), subtitle: Text('${r['condition']} — ${r['notes'] ?? ''}'), isThreeLine: true, trailing: Text('${r['status']}', style: TextStyle(color: r['status'] == 'مغلقة' ? green : orange, fontSize: 11, fontWeight: FontWeight.bold))))).toList()]); }
+class HealthRecordScreen extends StatefulWidget {
+  const HealthRecordScreen({super.key, required this.db});
+  final LivestockDb db;
+
+  @override
+  State<HealthRecordScreen> createState() => _HealthRecordScreenState();
 }
 
-class ReportsScreen extends StatefulWidget { const ReportsScreen({super.key, required this.db}); final LivestockDb db; @override State<ReportsScreen> createState() => _ReportsScreenState(); }
-class _ReportsScreenState extends State<ReportsScreen> { List<Map<String, dynamic>> entries = []; @override void initState() { super.initState(); load(); } Future<void> load() async { final rows = await widget.db.financialEntries(); if (mounted) setState(() => entries = rows); } double get income => entries.where((e) => e['kind'] == 'income').fold(0.0, (s, e) => s + (e['amount'] as num).toDouble()); double get expenses => entries.where((e) => e['kind'] == 'expense').fold(0.0, (s, e) => s + (e['amount'] as num).toDouble()); Future<void> addEntry() async { final amount = TextEditingController(); final category = TextEditingController(); final note = TextEditingController(); String kind = 'expense'; final saved = await showDialog<bool>(context: context, builder: (_) => StatefulBuilder(builder: (context, setDialog) => AlertDialog(title: const Text('إضافة حركة مالية'), content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [DropdownButtonFormField<String>(value: kind, decoration: const InputDecoration(labelText: 'نوع الحركة'), items: const [DropdownMenuItem(value: 'income', child: Text('إيراد')), DropdownMenuItem(value: 'expense', child: Text('مصروف'))], onChanged: (v) => setDialog(() => kind = v!)), const SizedBox(height: 10), TextField(controller: amount, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'المبلغ', suffixText: 'ر.س')), const SizedBox(height: 10), TextField(controller: category, decoration: const InputDecoration(labelText: 'التصنيف', hintText: 'أعلاف، علاج، بيع...')), const SizedBox(height: 10), TextField(controller: note, decoration: const InputDecoration(labelText: 'ملاحظات'))])), actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('إلغاء')), FilledButton(onPressed: () async { final value = double.tryParse(amount.text.trim()); if (value != null && value > 0 && category.text.trim().isNotEmpty) { await widget.db.addFinancialEntry(kind, value, category.text.trim(), note.text.trim()); Navigator.pop(context, true); } }, child: const Text('حفظ'))])); if (saved == true) load(); }
-  @override Widget build(BuildContext context) { final net = income - expenses; return Scaffold(appBar: AppBar(title: const Text('تقارير الأرباح والمصاريف', style: TextStyle(fontWeight: FontWeight.w900)), actions: [IconButton(onPressed: addEntry, icon: const Icon(Icons.add_circle, color: green))]), floatingActionButton: FloatingActionButton.extended(onPressed: addEntry, backgroundColor: green, icon: const Icon(Icons.add), label: const Text('حركة مالية')), body: ListView(padding: const EdgeInsets.all(18), children: [const Text('ملخص المزرعة', style: TextStyle(fontSize: 21, fontWeight: FontWeight.w900)), const SizedBox(height: 14), Row(children: [ReportMetric(label: 'الإيرادات', value: income, color: green, icon: Icons.trending_up), const SizedBox(width: 10), ReportMetric(label: 'المصاريف', value: expenses, color: orange, icon: Icons.trending_down)]), const SizedBox(height: 12), Container(padding: const EdgeInsets.all(18), decoration: BoxDecoration(color: net >= 0 ? green.withOpacity(.10) : Colors.red.withOpacity(.08), borderRadius: BorderRadius.circular(18)), child: Row(children: [Icon(net >= 0 ? Icons.account_balance_wallet : Icons.warning_amber, color: net >= 0 ? green : Colors.red), const SizedBox(width: 12), Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(net >= 0 ? 'صافي الربح' : 'صافي الخسارة', style: const TextStyle(fontWeight: FontWeight.bold)), Text('${net.toStringAsFixed(2)} ر.س', style: TextStyle(fontSize: 24, color: net >= 0 ? green : Colors.red, fontWeight: FontWeight.w900))])])), const SizedBox(height: 22), const Text('آخر الحركات المالية', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900)), const SizedBox(height: 8), ...entries.map((e) => Card(elevation: 0, color: Colors.white, child: ListTile(leading: CircleAvatar(backgroundColor: e['kind'] == 'income' ? green.withOpacity(.14) : orange.withOpacity(.14), child: Icon(e['kind'] == 'income' ? Icons.arrow_downward : Icons.arrow_upward, color: e['kind'] == 'income' ? green : orange)), title: Text(e['category'], style: const TextStyle(fontWeight: FontWeight.bold)), subtitle: Text(e['note'] ?? ''), trailing: Text('${(e['amount'] as num).toStringAsFixed(2)} ر.س', style: TextStyle(color: e['kind'] == 'income' ? green : orange, fontWeight: FontWeight.bold))))).toList()]); }
+class _HealthRecordScreenState extends State<HealthRecordScreen> {
+  List<Map<String, dynamic>> records = [];
+  String filter = 'الكل';
+
+  @override
+  void initState() {
+    super.initState();
+    load();
+  }
+
+  Future<void> load() async {
+    final rows = await widget.db.healthRecords();
+    if (mounted) setState(() => records = rows);
+  }
+
+  Future<void> addRecord() async {
+    final animal = TextEditingController();
+    final condition = TextEditingController();
+    final notes = TextEditingController();
+    String status = 'قيد المتابعة';
+    DateTime? followUp;
+
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (_) => StatefulBuilder(
+        builder: (context, setDialog) => AlertDialog(
+          title: const Text('إضافة حالة صحية'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: animal,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'رقم الرأس'),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: condition,
+                  decoration: const InputDecoration(labelText: 'الحالة / التشخيص'),
+                ),
+                const SizedBox(height: 10),
+                DropdownButtonFormField<String>(
+                  value: status,
+                  decoration: const InputDecoration(labelText: 'الحالة'),
+                  items: ['قيد المتابعة', 'تماثل للشفاء', 'مغلقة']
+                      .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                      .toList(),
+                  onChanged: (v) => setDialog(() => status = v!),
+                ),
+                const SizedBox(height: 10),
+                InkWell(
+                  onTap: () async {
+                    final d = await showDatePicker(
+                      context: context,
+                      firstDate: DateTime.now(),
+                      lastDate: DateTime.now().add(const Duration(days: 3650)),
+                      initialDate: DateTime.now().add(const Duration(days: 7)),
+                      locale: const Locale('ar', 'SA'),
+                    );
+                    if (d != null) {
+                      setDialog(() => followUp = DateTime(d.year, d.month, d.day, 9));
+                    }
+                  },
+                  child: InputDecorator(
+                    decoration: const InputDecoration(
+                      labelText: 'موعد المتابعة (اختياري)',
+                      suffixIcon: Icon(Icons.notifications_active_outlined),
+                    ),
+                    child: Text(
+                      followUp == null
+                          ? 'اختر تاريخ التذكير'
+                          : DateFormat('dd/MM/yyyy').format(followUp!),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: notes,
+                  maxLines: 2,
+                  decoration: const InputDecoration(labelText: 'ملاحظات'),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('إلغاء'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                if (animal.text.trim().isEmpty || condition.text.trim().isEmpty) return;
+                final recordId = await widget.db.addHealthRecord(
+                  animal.text.trim(),
+                  condition.text.trim(),
+                  notes.text.trim(),
+                  status,
+                );
+                if (followUp != null) {
+                  await MaqaniNotificationService.instance.scheduleHealthFollowUp(
+                    id: recordId + 200000,
+                    animalNumber: animal.text.trim(),
+                    condition: condition.text.trim(),
+                    date: followUp!,
+                  );
+                }
+                if (context.mounted) Navigator.pop(context, true);
+              },
+              child: const Text('حفظ'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (saved == true) load();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final visible = records.where((r) => filter == 'الكل' || r['status'] == filter).toList();
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('السجل المرضي', style: TextStyle(fontWeight: FontWeight.w900)),
+        actions: [IconButton(onPressed: addRecord, icon: const Icon(Icons.add_circle, color: orange))],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: addRecord,
+        backgroundColor: orange,
+        icon: const Icon(Icons.add),
+        label: const Text('حالة جديدة'),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(18),
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: orange.withOpacity(.10),
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.health_and_safety, color: orange, size: 32),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('متابعة صحة القطيع', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+                      Text('${records.length} حالات مسجلة', style: TextStyle(color: Colors.grey.shade700)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: ['الكل', 'قيد المتابعة', 'تماثل للشفاء', 'مغلقة']
+                  .map(
+                    (f) => Padding(
+                      padding: const EdgeInsets.only(left: 8),
+                      child: ChoiceChip(
+                        label: Text(f),
+                        selected: filter == f,
+                        selectedColor: orange.withOpacity(.18),
+                        onSelected: (_) => setState(() => filter = f),
+                      ),
+                    ),
+                  )
+                  .toList(),
+            ),
+          ),
+          const SizedBox(height: 14),
+          ...visible
+              .map(
+                (r) => Card(
+                  elevation: 0,
+                  color: Colors.white,
+                  margin: const EdgeInsets.only(bottom: 10),
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: r['status'] == 'مغلقة' ? green.withOpacity(.15) : orange.withOpacity(.15),
+                      child: Icon(
+                        r['status'] == 'مغلقة' ? Icons.check : Icons.medical_services_outlined,
+                        color: r['status'] == 'مغلقة' ? green : orange,
+                      ),
+                    ),
+                    title: Text('الرأس رقم ${r['animal_number']}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: Text('${r['condition']} — ${r['notes'] ?? ''}'),
+                    isThreeLine: true,
+                    trailing: Text(
+                      '${r['status']}',
+                      style: TextStyle(
+                        color: r['status'] == 'مغلقة' ? green : orange,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              )
+              .toList(),
+        ],
+      ),
+    );
+  }
 }
+
+class ReportsScreen extends StatefulWidget {
+  const ReportsScreen({super.key, required this.db});
+  final LivestockDb db;
+
+  @override
+  State<ReportsScreen> createState() => _ReportsScreenState();
+}
+
+class _ReportsScreenState extends State<ReportsScreen> {
+  List<Map<String, dynamic>> entries = [];
+
+  @override
+  void initState() {
+    super.initState();
+    load();
+  }
+
+  Future<void> load() async {
+    final rows = await widget.db.financialEntries();
+    if (mounted) setState(() => entries = rows);
+  }
+
+  double get income => entries.where((e) => e['kind'] == 'income').fold(0.0, (s, e) => s + (e['amount'] as num).toDouble());
+  double get expenses => entries.where((e) => e['kind'] == 'expense').fold(0.0, (s, e) => s + (e['amount'] as num).toDouble());
+
+  Future<void> addEntry() async {
+    final amount = TextEditingController();
+    final category = TextEditingController();
+    final note = TextEditingController();
+    String kind = 'expense';
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (_) => StatefulBuilder(
+        builder: (context, setDialog) => AlertDialog(
+          title: const Text('إضافة حركة مالية'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<String>(
+                  value: kind,
+                  decoration: const InputDecoration(labelText: 'نوع الحركة'),
+                  items: const [
+                    DropdownMenuItem(value: 'income', child: Text('إيراد')),
+                    DropdownMenuItem(value: 'expense', child: Text('مصروف')),
+                  ],
+                  onChanged: (v) => setDialog(() => kind = v!),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: amount,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(labelText: 'المبلغ', suffixText: 'ر.س'),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: category,
+                  decoration: const InputDecoration(labelText: 'التصنيف', hintText: 'أعلاف، علاج، بيع...'),
+                ),
+                const SizedBox(height: 10),
+                TextField(controller: note, decoration: const InputDecoration(labelText: 'ملاحظات')),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('إلغاء')),
+            FilledButton(
+              onPressed: () async {
+                final value = double.tryParse(amount.text.trim());
+                if (value == null || value <= 0 || category.text.trim().isEmpty) return;
+                await widget.db.addFinancialEntry(kind, value, category.text.trim(), note.text.trim());
+                if (context.mounted) Navigator.pop(context, true);
+              },
+              child: const Text('حفظ'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (saved == true) load();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final net = income - expenses;
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('تقارير الأرباح والمصاريف', style: TextStyle(fontWeight: FontWeight.w900)),
+        actions: [IconButton(onPressed: addEntry, icon: const Icon(Icons.add_circle, color: green))],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: addEntry,
+        backgroundColor: green,
+        icon: const Icon(Icons.add),
+        label: const Text('حركة مالية'),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(18),
+        children: [
+          const Text('ملخص المزرعة', style: TextStyle(fontSize: 21, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              ReportMetric(label: 'الإيرادات', value: income, color: green, icon: Icons.trending_up),
+              const SizedBox(width: 10),
+              ReportMetric(label: 'المصاريف', value: expenses, color: orange, icon: Icons.trending_down),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: net >= 0 ? green.withOpacity(.10) : Colors.red.withOpacity(.08),
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Row(
+              children: [
+                Icon(net >= 0 ? Icons.account_balance_wallet : Icons.warning_amber, color: net >= 0 ? green : Colors.red),
+                const SizedBox(width: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(net >= 0 ? 'صافي الربح' : 'صافي الخسارة', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    Text(
+                      '${net.toStringAsFixed(2)} ر.س',
+                      style: TextStyle(fontSize: 24, color: net >= 0 ? green : Colors.red, fontWeight: FontWeight.w900),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 22),
+          const Text('آخر الحركات المالية', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 8),
+          ...entries
+              .map(
+                (e) => Card(
+                  elevation: 0,
+                  color: Colors.white,
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: e['kind'] == 'income' ? green.withOpacity(.14) : orange.withOpacity(.14),
+                      child: Icon(
+                        e['kind'] == 'income' ? Icons.arrow_downward : Icons.arrow_upward,
+                        color: e['kind'] == 'income' ? green : orange,
+                      ),
+                    ),
+                    title: Text(e['category'], style: const TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: Text(e['note'] ?? ''),
+                    trailing: Text(
+                      '${(e['amount'] as num).toStringAsFixed(2)} ر.س',
+                      style: TextStyle(color: e['kind'] == 'income' ? green : orange, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+              )
+              .toList(),
+        ],
+      ),
+    );
+  }
+}
+
 class ReportMetric extends StatelessWidget { const ReportMetric({super.key, required this.label, required this.value, required this.color, required this.icon}); final String label; final double value; final Color color; final IconData icon; @override Widget build(BuildContext context) => Expanded(child: Container(padding: const EdgeInsets.all(15), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Icon(icon, color: color), const SizedBox(height: 9), Text(label, style: TextStyle(color: Colors.grey.shade600)), const SizedBox(height: 4), Text('${value.toStringAsFixed(2)} ر.س', style: TextStyle(color: color, fontSize: 17, fontWeight: FontWeight.w900))]))); }
 
 class EmptyState extends StatelessWidget { const EmptyState({super.key}); @override Widget build(BuildContext context) => Padding(padding: const EdgeInsets.all(30), child: Column(children: [Icon(Icons.pets_outlined, size: 55, color: orange.withOpacity(.5)), const SizedBox(height: 8), const Text('لا توجد رؤوس مطابقة للبحث', style: TextStyle(color: Colors.grey))])); }
