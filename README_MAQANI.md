@@ -47,6 +47,39 @@ await MaqaniNotificationService.instance.scheduleHealthFollowUp(
 
 النسخة الحالية تبني APK غير موقّع بتوقيع release مخصص؛ قبل النشر في Google Play يجب إضافة keystore مشفّر إلى GitHub Secrets واستخدامه في خطوة توقيع منفصلة، وعدم وضع ملف keystore أو كلمات المرور داخل المستودع.
 
+## مزامنة SQLite مع السحابة
+
+يوجد ملف `lib/sync_service.dart` كطبقة REST عامة، ويمكن استخدامه مع Supabase Data API أو خادم REST خاص. النمط المقترح هو **Offline-first**: تُحفظ العملية أولاً في SQLite، ثم تُرفع عند توفر الاتصال، ويُعاد تنزيل التغييرات بعد تسجيل الدخول أو عودة الشبكة.
+
+مثال الاستخدام مع Supabase:
+
+```dart
+final sync = MaqaniSyncService(
+  baseUrl: const String.fromEnvironment('SUPABASE_URL'),
+  publishableKey: const String.fromEnvironment('SUPABASE_PUBLISHABLE_KEY'),
+  userId: currentUserId,
+);
+
+await sync.sync(localTables: {
+  'animals': localAnimals,
+  'health_records': localHealthRecords,
+  'financial_entries': localFinancialEntries,
+});
+```
+
+لا تضع `service_role_key` داخل APK؛ يجب استخدام publishable/anon key مع تسجيل دخول المستخدم وسياسات RLS. أُضيف ملف SQL اختياري في `supabase/migrations/202608230001_sync.sql` ينشئ الجداول السحابية مع `owner_id` و`local_id` و`updated_at` و`deleted_at` وسياسات تمنع المستخدم من الوصول إلى بيانات مزرعة أخرى. هذا يتبع قاعدة Supabase التي تجعل `auth.uid()` حدّ الملكية والصلاحية [2].
+
+للمزامنة ثنائية الاتجاه في الإنتاج، أضف إلى SQLite حقول `updated_at` و`sync_status` و`deleted_at`. عند الحفظ يُعيّن السجل إلى `pending`، وعند نجاح الرفع إلى `synced`. إذا حدث تعديل على الجهاز والخادم معاً، استخدم قاعدة واضحة مثل **آخر تعديل يفوز** بالاعتماد على `updated_at` UTC، أو احتفظ بنسختين واعرض التعارض للمستخدم في شاشة المزامنة. لا تحذف السجل فوراً؛ استخدم soft delete حتى يصل الحذف إلى الخادم ثم احذف السجل محلياً بعد تأكيد المزامنة.
+
+يوجد مساران عمليان للمزامنة:
+
+| المسار | المزايا | ما يحتاجه |
+|---|---|---|
+| Supabase | PostgreSQL وAuth وRLS وRealtime جاهزة | مشروع Supabase، تسجيل دخول، وMigration SQL |
+| خادم REST خاص | تحكم كامل واستضافة داخلية أو سحابية | API للمصادقة وupsert ونسخ احتياطي ومراقبة |
+
+لبيئة مزرعة داخلية بلا إنترنت خارجي، يمكن تشغيل REST API داخل الشبكة المحلية على جهاز دائم التشغيل، مع إبقاء SQLite هو المصدر المحلي الأساسي. للمزامنة عبر الإنترنت بين أجهزة متعددة، يُفضّل Supabase أو خادم HTTPS موثوق مع نسخ احتياطي.
+
 ## التشغيل
 
 بعد تثبيت Flutter وAndroid SDK، نفّذ:
@@ -63,3 +96,8 @@ flutter build apk --debug
 ```
 
 ملاحظة: بيئة التنفيذ الحالية لا تحتوي على أمر `flutter` أو `dart`، لذلك تعذّر تشغيل `flutter analyze` وبناء APK داخلها. تم الاحتفاظ بملفات Android الحالية وتحديث اسم التطبيق الظاهر إلى «مقاني» في `AndroidManifest.xml`.
+
+### References
+
+[1]: https://pub.dev/packages/flutter_local_notifications "flutter_local_notifications — Pub.dev"
+[2]: https://supabase.com/docs/guides/database/postgres/row-level-security "Supabase Row Level Security"
