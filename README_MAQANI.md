@@ -129,6 +129,36 @@ https://YOUR_PROJECT_REF.supabase.co/auth/v1/callback
 
 على Android تمت إضافة `intent-filter` للمخطط `io.maqani.app` والمضيف `auth-callback`. عند نجاح OAuth يستقبل `AuthGate` تغيّر الجلسة عبر `onAuthStateChange` ويعرض التطبيق مباشرة. إذا كان الحساب الاجتماعي جديداً، ينشئ Trigger المستخدم صف `profiles` المرتبط بـ `auth.users.id`، ولا ينبغي استخدام اسم البريد أو بيانات الملف الشخصي كبديل عن هوية المستخدم في سياسات RLS.
 
+## حماية بيانات المزرعة بسياسات RLS
+
+تعتمد حماية البيانات السحابية على ربط كل صف بـ `owner_id`، وهو معرّف UUID الصادر من `auth.users`. لا تستخدم البريد الإلكتروني أو `user_metadata` كحد أمني؛ القاعدة الآمنة هي أن يطابق `owner_id` قيمة `auth.uid()` داخل PostgreSQL. أُضيفت الهجرة `supabase/migrations/202608230003_harden_rls.sql` لتفعيل RLS، إلغاء صلاحيات `anon`، منح أقل صلاحيات لازمة لدور `authenticated`، وإنشاء سياسات منفصلة للقراءة والإضافة والتعديل والحذف.
+
+طبّق الهجرات بالترتيب:
+
+```bash
+supabase db push
+```
+
+وعند إضافة سجل من Flutter، يجب إرسال معرّف المستخدم الحالي فقط، بينما تمنع RLS أي قيمة لا تطابق الجلسة:
+
+```dart
+final user = Supabase.instance.client.auth.currentUser;
+if (user == null) throw StateError('يجب تسجيل الدخول أولاً');
+
+await Supabase.instance.client.from('animals').insert({
+  'owner_id': user.id,
+  'local_id': localId,
+  'number': number,
+  'tag_color': tagColor,
+  'animal_type': animalType,
+  'gender': gender,
+});
+```
+
+سياسات `SELECT` و`UPDATE` و`DELETE` تستخدم `using ((select auth.uid()) = owner_id)`، بينما تستخدم `INSERT` ونتيجة `UPDATE` شرط `with check`. أُضيف أيضاً Trigger يمنع تغيير `owner_id` بعد إنشاء السجل. لا تمنح دور `anon` صلاحية على جداول الحيوانات أو السجلات الصحية أو المالية، ولا تستخدم `service_role_key` من تطبيق Android لأنه يتجاوز RLS.
+
+اختبر الحماية بحسابين مختلفين: يجب أن يرى الحساب الأول سجلاته فقط، وأن يفشل إدخال صف يحمل `owner_id` للحساب الثاني، وأن يعيد تحديث أو حذف سجل الحساب الثاني صفراً أو خطأ صلاحيات. كما يجب اختبار الطلبات دون جلسة، وانتهاء الجلسة، ومحاولة تغيير `owner_id`، ومحاولة الوصول المباشر عبر Data API. توصي Supabase بتفعيل RLS على كل جدول مكشوف وكتابة سياسات لكل عملية [10].
+
 ## التشغيل
 
 بعد تثبيت Flutter وAndroid SDK، نفّذ:
@@ -157,3 +187,4 @@ flutter build apk --debug
 [7]: https://supabase.com/docs/guides/auth/passwords "Supabase Password-based Auth"
 [8]: https://supabase.com/docs/guides/auth/social-login/auth-google "Supabase Login with Google"
 [9]: https://supabase.com/docs/guides/auth/social-login/auth-apple "Supabase Login with Apple"
+[10]: https://supabase.com/docs/guides/database/postgres/row-level-security "Supabase Row Level Security"
