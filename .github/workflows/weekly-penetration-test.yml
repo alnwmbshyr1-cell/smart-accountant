@@ -1,0 +1,94 @@
+name: Weekly Authorized PenTest Digest
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  weekly-pentest:
+    name: Staging PenTest and Slack digest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: staging-security-test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare bounded PenTest environment
+        env:
+          GATEWAY_URL: ${{ secrets.STAGING_GATEWAY_URL }}
+          GATEWAY_INGRESS_TOKEN: ${{ secrets.STAGING_GATEWAY_INGRESS_TOKEN }}
+          GATEWAY_CA_B64: ${{ secrets.STAGING_GATEWAY_CA_B64 }}
+          GATEWAY_CLIENT_CERT_B64: ${{ secrets.STAGING_GATEWAY_CLIENT_CERT_B64 }}
+          GATEWAY_CLIENT_KEY_B64: ${{ secrets.STAGING_GATEWAY_CLIENT_KEY_B64 }}
+        run: |
+          set -euo pipefail
+          test -n "$GATEWAY_URL"
+          test -n "$GATEWAY_INGRESS_TOKEN"
+          mkdir -p "$RUNNER_TEMP/gateway"
+          if [[ -n "${GATEWAY_CA_B64:-}" ]]; then printf '%s' "$GATEWAY_CA_B64" | base64 --decode > "$RUNNER_TEMP/gateway/ca.pem"; fi
+          if [[ -n "${GATEWAY_CLIENT_CERT_B64:-}" ]]; then printf '%s' "$GATEWAY_CLIENT_CERT_B64" | base64 --decode > "$RUNNER_TEMP/gateway/client.crt"; fi
+          if [[ -n "${GATEWAY_CLIENT_KEY_B64:-}" ]]; then printf '%s' "$GATEWAY_CLIENT_KEY_B64" | base64 --decode > "$RUNNER_TEMP/gateway/client.key"; chmod 600 "$RUNNER_TEMP/gateway/client.key"; fi
+
+      - name: Run authorized bounded checks
+        id: pentest
+        continue-on-error: true
+        env:
+          PENTEST_AUTHORIZED: 'true'
+          PENTEST_ENV: staging
+          PENTEST_TEST_IDEMPOTENCY: 'true'
+          GATEWAY_URL: ${{ secrets.STAGING_GATEWAY_URL }}
+          GATEWAY_INGRESS_TOKEN: ${{ secrets.STAGING_GATEWAY_INGRESS_TOKEN }}
+          GATEWAY_CA_FILE: ${{ runner.temp }}/gateway/ca.pem
+          GATEWAY_CLIENT_CERT_FILE: ${{ runner.temp }}/gateway/client.crt
+          GATEWAY_CLIENT_KEY_FILE: ${{ runner.temp }}/gateway/client.key
+          PENTEST_REPORT: weekly-pentest/pentest-report.md
+        run: |
+          mkdir -p weekly-pentest
+          ./tooling/security_gateway_pentest_safe.sh
+
+      - name: Build weekly sanitized digest
+        id: digest
+        if: always()
+        env:
+          SECURITY_PENTEST_EXPORT_URL: ${{ secrets.SECURITY_PENTEST_EXPORT_URL }}
+          SECURITY_PENTEST_EXPORT_TOKEN: ${{ secrets.SECURITY_PENTEST_EXPORT_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$SECURITY_PENTEST_EXPORT_URL"
+          python3 tooling/weekly_pentest_digest.py \
+            --export-url "$SECURITY_PENTEST_EXPORT_URL" \
+            --export-token "$SECURITY_PENTEST_EXPORT_TOKEN" \
+            --markdown-output weekly-pentest/digest.md \
+            --json-output weekly-pentest/digest.json
+
+      - name: Publish summary
+        if: always()
+        run: cat weekly-pentest/digest.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+
+      - name: Notify Slack security channel
+        if: always() && steps.digest.outcome == 'success'
+        env:
+          SECURITY_SLACK_WEBHOOK_URL: ${{ secrets.SECURITY_SLACK_WEBHOOK_URL }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_WORKFLOW: ${{ github.workflow }}
+        run: python3 tooling/weekly_pentest_digest.py --input weekly-pentest/pentest-report.md --markdown-output /tmp/digest.md --json-output /tmp/digest.json --send-slack
+
+      - name: Enforce PenTest result
+        if: always() && steps.pentest.outcome != 'success'
+        run: |
+          echo 'Authorized PenTest checks failed; see the sanitized artifact and Slack digest.'
+          exit 1
+
+      - name: Upload sanitized artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: weekly-pentest-digest-${{ github.run_id }}
+          path: weekly-pentest/
+          if-no-files-found: warn
+          retention-days: 7
