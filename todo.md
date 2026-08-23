@@ -664,3 +664,10 @@
 - [x] التحقق من رفض body مختلف وإعادة المحاولة بعد انتهاء القفل
 - [x] دمج الاختبار في GitHub Actions مع Redis service وartifacts منقحة
 - [x] تحديث المهارة والتوثيق والتحقق والدفع
+
+
+## CI Idempotency Load Test
+- [x] إضافة Job k6 مستقل يعتمد على نجاح Redis integration
+- [x] إضافة smoke وmedium profiles مع thresholds وartifacts
+- [x] إضافة حواجز staging ومنع production وإشعار فشل منقح
+- [x] تحديث المهارة والتوثيق والتحقق والدفع

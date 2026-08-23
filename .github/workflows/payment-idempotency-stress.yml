@@ -1,4 +1,4 @@
-name: Authorized Payment Idempotency Stress Test
+name: Authorized Payment Idempotency CI
 
 on:
   workflow_dispatch:
@@ -11,12 +11,49 @@ on:
         options:
           - smoke
           - medium
+  pull_request:
+    paths:
+      - 'tooling/payment_idempotency_stress_test.js'
+      - 'tooling/redis_idempotency_integration.py'
+      - 'tooling/test_*.py'
+      - '.github/workflows/payment-idempotency-stress.yml'
 
 permissions:
   contents: read
 
 jobs:
-  payment-idempotency:
+  redis-integration:
+    name: Redis lock and key-reuse integration
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    services:
+      redis:
+        image: redis:7.4-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install pinned Redis client
+        run: python -m pip install --disable-pip-version-check 'redis==6.4.0'
+      - name: Run isolated Redis integration test
+        env:
+          REDIS_URL: redis://127.0.0.1:6379/15
+          TEST_ID: ci-${{ github.run_id }}
+        run: python tooling/redis_idempotency_integration.py
+
+  payment-load:
+    name: k6 idempotency load test
+    needs: redis-integration
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     timeout-minutes: 12
     environment: staging-security-test
@@ -27,10 +64,8 @@ jobs:
       MAX_RETRIES: '2'
     steps:
       - uses: actions/checkout@v4
-
       - name: Install k6
         uses: grafana/setup-k6-action@v1
-
       - name: Validate protected staging target
         shell: bash
         run: |
@@ -45,31 +80,20 @@ jobs:
             echo 'Production payment targets are forbidden' >&2
             exit 1
           fi
-
-      - name: Run payment idempotency smoke test
+      - name: Run k6 smoke profile
         if: inputs.profile == 'smoke'
-        shell: bash
         run: |
-          set -euo pipefail
-          k6 run \
-            --summary-export=payment-stress-results.json \
-            --vus 2 \
-            --duration 20s \
-            tooling/payment_idempotency_stress_test.js
-
-      - name: Run payment idempotency medium profile
+          k6 run --summary-export=payment-stress-results.json \
+            --vus 2 --duration 20s tooling/payment_idempotency_stress_test.js
+      - name: Run k6 medium profile
         if: inputs.profile == 'medium'
-        shell: bash
         run: |
-          set -euo pipefail
-          k6 run \
-            --summary-export=payment-stress-results.json \
+          k6 run --summary-export=payment-stress-results.json \
             tooling/payment_idempotency_stress_test.js
-
-      - name: Upload redacted result
+      - name: Upload redacted k6 result
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: payment-idempotency-stress-${{ github.run_id }}
+          name: payment-idempotency-k6-${{ github.run_id }}
           path: payment-stress-results.json
           retention-days: 7
