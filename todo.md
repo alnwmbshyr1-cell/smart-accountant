@@ -573,3 +573,9 @@
 - [x] إضافة provisioning لمصدر Prometheus ولوحة Grafana
 - [x] إضافة اختبار صحة JSON وPromQL وتوثيق الاستيراد
 - [x] تحديث المهارة والتحقق ثم دفع التعديل
+
+
+## Per-Endpoint PromQL Latency
+- [x] إضافة متغير Endpoint واستعلامات p95 وp99 حسب route
+- [x] إضافة اختبارات صحة PromQL وتحقق أسماء histogram labels
+- [x] تحديث المهارة وتوثيق cardinality ثم التحقق والدفع
