@@ -622,3 +622,10 @@
 - [x] تصنيف الثغرات الجديدة والعائدة والمغلقة وتغيرات الشدة
 - [x] دمج النتيجة في التقرير الأسبوعي وSlack وCI
 - [x] إضافة اختبارات وتحديث المهارة والتحقق ثم الدفع
+
+
+## Safe Endpoint Abuse-Resistance Testing
+- [x] إضافة اختبار محدود للتحقق من 429 وRetry-After وrate limiting
+- [x] إضافة اختبار timeout وpayload/connection bounds دون ضغط DDoS فعلي
+- [x] ربط الفحوص بـCI مع guard يمنع production targets
+- [x] تحديث المهارة والتوثيق والاختبارات ثم التحقق والدفع

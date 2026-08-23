@@ -1,0 +1,47 @@
+name: Authorized Gateway Resilience Check
+
+on:
+  workflow_dispatch:
+    inputs:
+      requests:
+        description: Bounded request count (maximum 100)
+        required: false
+        default: '40'
+      rps:
+        description: Bounded request rate (maximum 20 RPS)
+        required: false
+        default: '10'
+
+permissions:
+  contents: read
+
+jobs:
+  resilience:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: staging-security-test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run bounded staging resilience check
+        env:
+          PENTEST_ENV: staging
+          RESILIENCE_TEST_AUTHORIZED: 'true'
+          RESILIENCE_TEST_URL: ${{ secrets.STAGING_HEALTH_URL }}
+          GATEWAY_INGRESS_TOKEN: ${{ secrets.STAGING_GATEWAY_INGRESS_TOKEN }}
+          REQUESTS: ${{ inputs.requests }}
+          RPS: ${{ inputs.rps }}
+        run: |
+          set -euo pipefail
+          test -n "$RESILIENCE_TEST_URL"
+          python3 tooling/security_gateway_resilience_test.py \
+            --url "$RESILIENCE_TEST_URL" \
+            --requests "$REQUESTS" \
+            --rps "$RPS" \
+            --output resilience-results.json
+      - name: Upload sanitized result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gateway-resilience-${{ github.run_id }}
+          path: resilience-results.json
+          retention-days: 7
