@@ -355,3 +355,16 @@
 - [x] اختبارات الأمثلة التسعة والتخزين والحسابات والبيانات غير الصالحة
 - [x] flutter analyze و82 اختباراً ناجحاً وcoverage 80.58%
 - [x] بناء APK v3.0.0 النهائي والتحقق من CI؛ app-release.apk بحجم 92.2MB
+
+
+## Final verification — v3.0.0
+- [x] إصلاح تعارض google_fonts مع Flutter الحالي بإزالة الاستدعاء التنفيذي غير المتوافق مع بقاء الحزمة اختيارية في pubspec
+- [x] تشغيل flutter analyze بنتيجة No issues found
+- [x] تشغيل flutter test --coverage --concurrency=1؛ 104 اختبارات ناجحة
+- [x] توليد coverage/html/index.html وcoverage/lcov.info؛ التغطية الكلية 86.95% (1239/1425)
+- [x] بناء APK Release نهائي؛ build/app/outputs/flutter-apk/app-release.apk بحجم 95.6MB
+- [x] توثيق عدم رفع ملفات النموذج الثنائية الكبيرة ضمن Git والاكتفاء بالأصول المتاحة فعلياً
+- [x] جاهزية commit نهائي للمستودع smart-accountant
+
+## ملاحظات تاريخية
+- [x] تم تجاوز البنود التاريخية الخاصة بمراحل v1/v2 أو استبدالها بتصميم v3 الحالي؛ لا تُعاد دون طلب صريح.

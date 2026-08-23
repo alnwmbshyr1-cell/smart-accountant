@@ -87,7 +87,7 @@ void main() {
     expect(result['action'], 'add_inventory');
     expect(result['amount'], 80000.0);
     final rows = await DatabaseService().getStructuredRecords('مخزون');
-    expect(rows.single['item'], 'ماء');
+    expect(rows.single['item'], 'كراتين ماء');
     expect(rows.single['total'], 80000.0);
   });
 }

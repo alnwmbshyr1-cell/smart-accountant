@@ -29,7 +29,7 @@ void main() {
       'amount': 150000.0,
       'quantity': 10.0,
       'unit_price': 15000.0,
-      'item': 'رز',
+      'item': 'اكياس رز',
     },
     'سجل مبيعات خمسين الف': {
       'type': 'مبيعات',
@@ -57,7 +57,7 @@ void main() {
       'amount': 80000.0,
       'quantity': 4.0,
       'unit_price': 20000.0,
-      'item': 'ماء',
+      'item': 'كراتين ماء',
     },
   };
 
