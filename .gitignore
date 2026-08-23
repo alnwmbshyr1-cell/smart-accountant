@@ -42,3 +42,6 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 gemma-2b-it-q4.bin
+backend/.env
+backend/node_modules
+backend/dist

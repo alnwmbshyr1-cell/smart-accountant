@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 
+import 'accounting_backend_client.dart';
+
 /// خدمة Gemini لتحليل الأوامر المحاسبية عند توفر الإنترنت ومفتاح صالح.
 ///
 /// لا تضع مفتاح API داخل الكود أو Git. يُحفظ المفتاح في
@@ -16,6 +18,7 @@ class GeminiService {
     this.modelName = 'gemini-1.5-flash',
     this.textProvider,
     this.apiKeyLoader,
+    this.backendClient,
     this.timeout = requestTimeout,
   }) : _storage = storage ?? const FlutterSecureStorage();
 
@@ -26,6 +29,7 @@ class GeminiService {
   final String modelName;
   final GeminiTextProvider? textProvider;
   final GeminiApiKeyLoader? apiKeyLoader;
+  final AccountingBackendClient? backendClient;
   final Duration timeout;
   String? _cachedApiKey;
 
@@ -67,6 +71,11 @@ class GeminiService {
   Future<Map<String, dynamic>?> processCommand(String text) async {
     final input = text.trim();
     if (input.isEmpty) return null;
+
+    // Production mode: the API key stays on the Backend and is never sent by Flutter.
+    if (backendClient != null) {
+      return backendClient!.parseCommand(input);
+    }
 
     final apiKey = await readApiKey();
     if (apiKey == null) return null;

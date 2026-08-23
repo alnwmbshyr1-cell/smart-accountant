@@ -368,3 +368,13 @@
 
 ## ملاحظات تاريخية
 - [x] تم تجاوز البنود التاريخية الخاصة بمراحل v1/v2 أو استبدالها بتصميم v3 الحالي؛ لا تُعاد دون طلب صريح.
+
+
+## Gemini Backend Proxy Integration
+- [x] إنشاء Backend Node.js/TypeScript مستقل مع Endpoint `/v1/accounting/parse`
+- [x] إضافة Zod للتحقق من الطلب واستجابة Gemini والأنواع والمبالغ والكميات
+- [x] إضافة مصادقة ومحدد معدل ومهلة وإخفاء الأسرار في سجلات Backend
+- [x] نقل استدعاء Gemini من عميل Flutter إلى AccountingBackendClient عبر HTTPS
+- [x] الإبقاء على AiAgentParser كـ fallback أوفلاين عند فشل Backend أو غياب الشبكة
+- [x] إضافة اختبارات HTTP fake لمسارات النجاح والاستجابة غير 200 وtimeout وJSON غير الكائني
+- [x] تشغيل analyze والاختبارات وبناء Backend TypeScript وتوثيق إعدادات التشغيل دون مفتاح داخل Git
