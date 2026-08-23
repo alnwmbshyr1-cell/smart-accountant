@@ -75,6 +75,39 @@ groups:
           description: JWT rejection rate exceeds 1 per second for 5 minutes; investigate abuse or client clock issues.
           runbook: https://runbooks.example.com/smart-accountant/auth-spike
 
+      - alert: SmartAccountantDeadlockBurst
+        expr: increase(smart_accountant_db_deadlocks_total{job="smart-accountant-backend"}[10m]) >= 5
+        for: 1m
+        labels:
+          severity: critical
+          category: database
+        annotations:
+          summary: Repeated database deadlocks detected
+          description: At least 5 database deadlocks occurred in 10 minutes; payment writes may be retrying or contending.
+          runbook: https://runbooks.example.com/smart-accountant/database-deadlocks
+
+      - alert: SmartAccountantDeadlockRateHigh
+        expr: rate(smart_accountant_db_deadlocks_total{job="smart-accountant-backend"}[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: high
+          category: database
+        annotations:
+          summary: Database deadlock rate is high
+          description: Database deadlocks exceed 0.1 per second for 5 minutes; inspect lock ordering, transaction duration, and retry exhaustion.
+          runbook: https://runbooks.example.com/smart-accountant/database-deadlocks
+
+      - alert: SmartAccountantStagingPaymentTestFailed
+        expr: increase(smart_accountant_staging_test_failures_total{test="payment-idempotency",environment="staging"}[15m]) > 0
+        for: 1m
+        labels:
+          severity: high
+          category: staging
+        annotations:
+          summary: Payment Idempotency staging test failed
+          description: A protected staging payment test failed in the last 15 minutes; inspect the exact GitHub Actions run before promotion.
+          runbook: https://runbooks.example.com/smart-accountant/staging-payment-test
+
       - alert: SmartAccountantHighMemory
         expr: smart_accountant_process_rss_bytes{job="smart-accountant-backend"} > 536870912
         for: 10m

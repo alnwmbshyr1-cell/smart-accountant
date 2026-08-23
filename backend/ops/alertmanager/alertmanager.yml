@@ -5,11 +5,20 @@ global:
 
 route:
   receiver: smart-accountant-slack
-  group_by: [alertname, job, severity]
+  group_by: [alertname, job, severity, category]
   group_wait: 30s
   group_interval: 5m
   repeat_interval: 4h
   routes:
+    - matchers:
+        - category="database"
+        - severity="critical"
+      receiver: smart-accountant-critical
+      continue: true
+    - matchers:
+        - category="staging"
+      receiver: smart-accountant-slack
+      continue: false
     - matchers:
         - severity="critical"
       receiver: smart-accountant-critical

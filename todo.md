@@ -650,3 +650,10 @@
 - [x] إضافة quality gates للتكرار والـretry والـ429/5xx مع artifacts منقحة
 - [x] توثيق استراتيجية Deadlock وserialization failures مع retry محدود وآمن
 - [x] إضافة اختبارات الحواجز والتحقق وتحديث المهارة ثم الدفع
+
+
+## Deadlock Alerts and Replay Protection
+- [x] إضافة قواعد Prometheus لتنبيهات Deadlock وفشل staging
+- [x] ربط Alertmanager بمسار Slack آمن مع deduplication وrecovery
+- [x] توثيق ضوابط Webhook وتوقيع الطلبات وRedis Idempotency ضد Replay
+- [x] إضافة اختبارات الحماية والتحقق وتحديث المهارة ثم الدفع
