@@ -1,0 +1,66 @@
+name: Weekly Security Gateway Report
+
+on:
+  schedule:
+    - cron: '0 7 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  weekly-security-report:
+    name: Generate and send weekly gateway report
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Fetch redacted audit export
+        env:
+          SECURITY_AUDIT_EXPORT_URL: ${{ secrets.SECURITY_AUDIT_EXPORT_URL }}
+          SECURITY_AUDIT_EXPORT_TOKEN: ${{ secrets.SECURITY_AUDIT_EXPORT_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$SECURITY_AUDIT_EXPORT_URL"
+          test -n "$SECURITY_AUDIT_EXPORT_TOKEN"
+          mkdir -p weekly-security
+          curl --fail --silent --show-error --location \
+            --connect-timeout 10 --max-time 60 \
+            --header "Authorization: Bearer $SECURITY_AUDIT_EXPORT_TOKEN" \
+            --header 'Accept: application/json' \
+            "$SECURITY_AUDIT_EXPORT_URL" \
+            --output weekly-security/events.json
+
+      - name: Build weekly report
+        env:
+          WORKFLOW_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          python3 tooling/weekly_security_report.py \
+            --input weekly-security/events.json \
+            --markdown-output weekly-security/report.md \
+            --workflow-url "$WORKFLOW_URL"
+          cat weekly-security/report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Send report to Slack
+        env:
+          SECURITY_SLACK_WEBHOOK_URL: ${{ secrets.SECURITY_SLACK_WEBHOOK_URL }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_WORKFLOW: ${{ github.workflow }}
+        run: |
+          python3 tooling/weekly_security_report.py \
+            --input weekly-security/events.json \
+            --markdown-output /tmp/weekly-security-report.md \
+            --workflow-url "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --send-slack
+
+      - name: Upload weekly report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: weekly-security-report-${{ github.run_id }}
+          path: weekly-security/report.md
+          if-no-files-found: warn
+          retention-days: 30
