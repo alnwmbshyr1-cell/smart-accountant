@@ -468,3 +468,11 @@
 - [x] إضافة فحص Snyk اختياري مشروط بوجود SNYK_TOKEN دون فشل زائف عند غيابه
 - [x] ربط نتائج الفحص ببوابة الجودة وحفظ التقارير دون أسرار
 - [x] تحديث المهارة بوصف سياسة الثغرات وطرق التشغيل المحلي وCI
+
+
+## Unified GitHub Security Report
+- [x] جمع SARIF من Trivy وSnyk مع categories فريدة داخل GitHub Code Scanning
+- [x] توليد تقرير Markdown وJSON موحد حسب الأداة والشدة والمكوّن والحالة
+- [x] إضافة ملخص إلى GITHUB_STEP_SUMMARY ورفع التقرير كـartifact قصير الاحتفاظ
+- [x] إضافة اختبار parser للتقرير يمنع التسريب ويعالج SARIF الناقص
+- [x] تحديث المهارة بدليل GitHub Security وREST API وإعادة التشغيل

@@ -314,10 +314,57 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
+  security-report:
+    name: Unified security report
+    runs-on: ubuntu-24.04
+    needs: [container-security, snyk]
+    if: always()
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Download Trivy reports
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          pattern: trivy-reports-${{ github.sha }}
+          path: security-inputs
+          merge-multiple: true
+      - name: Download Snyk reports
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          pattern: snyk-reports-${{ github.sha }}
+          path: security-inputs
+          merge-multiple: true
+      - name: Generate unified report
+        run: |
+          mkdir -p security-report
+          python3 tooling/merge_security_reports.py \
+            --input trivy-fs=security-inputs/security/trivy-fs.sarif \
+            --input trivy-prometheus=security-inputs/security/trivy-prometheus.sarif \
+            --input trivy-alertmanager=security-inputs/security/trivy-alertmanager.sarif \
+            --input snyk-node=security-inputs/snyk-node.sarif \
+            --json-output security-report/security-report.json \
+            --markdown-output security-report/security-report.md \
+            | tee security-report/summary.json
+      - name: Add report to workflow summary
+        if: always() && hashFiles('security-report/security-report.md') != ''
+        run: cat security-report/security-report.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload unified security report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unified-security-report-${{ github.sha }}
+          path: security-report/
+          if-no-files-found: error
+          retention-days: 30
+
   quality:
     name: Quality gate
     runs-on: ubuntu-latest
-    needs: [fast, integration, coverage, prometheus-rules, security, container-security, snyk]
+    needs: [fast, integration, coverage, prometheus-rules, security, container-security, snyk, security-report]
     if: always()
     steps:
       - name: Require all quality jobs to pass
@@ -329,6 +376,7 @@ jobs:
           SECURITY_RESULT: ${{ needs.security.result }}
           CONTAINER_SECURITY_RESULT: ${{ needs.container-security.result }}
           SNYK_RESULT: ${{ needs.snyk.result }}
+          SECURITY_REPORT_RESULT: ${{ needs.security-report.result }}
         run: |
           set -euo pipefail
           echo "fast=${FAST_RESULT}"
@@ -338,6 +386,7 @@ jobs:
           echo "security=${SECURITY_RESULT}"
           echo "container-security=${CONTAINER_SECURITY_RESULT}"
           echo "snyk=${SNYK_RESULT}"
+          echo "security-report=${SECURITY_REPORT_RESULT}"
           test "$FAST_RESULT" = success
           test "$INTEGRATION_RESULT" = success
           test "$COVERAGE_RESULT" = success
@@ -345,6 +394,7 @@ jobs:
           test "$SECURITY_RESULT" = success
           test "$CONTAINER_SECURITY_RESULT" = success
           test "$SNYK_RESULT" = success || test "$SNYK_RESULT" = skipped
+          test "$SECURITY_REPORT_RESULT" = success
 
   build:
     name: Build and publish APK
