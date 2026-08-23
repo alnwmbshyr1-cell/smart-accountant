@@ -361,10 +361,67 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+  security-notify:
+    name: Critical security notifications
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    needs: [security-report]
+    if: always()
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Download unified report
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: unified-security-report-${{ github.sha }}
+          path: unified-report
+      - name: Evaluate Critical findings
+        id: evaluate
+        shell: bash
+        run: |
+          set -euo pipefail
+          report="unified-report/security-report.json"
+          if [ ! -s "$report" ]; then
+            echo 'critical_count=0' >> "$GITHUB_OUTPUT"
+            echo 'Unified report is unavailable; the security-report job result remains authoritative.'
+            exit 0
+          fi
+          critical_count=$(python3 - "$report" <<'PY'
+          import json, sys
+          with open(sys.argv[1], encoding='utf-8') as handle:
+              report = json.load(handle)
+          findings = report.get('findings', [])
+          print(sum(1 for item in findings if isinstance(item, dict) and item.get('severity') == 'critical'))
+          PY
+          )
+          echo "critical_count=$critical_count" >> "$GITHUB_OUTPUT"
+          echo "Critical findings: $critical_count"
+      - name: Notify Slack and email
+        if: steps.evaluate.outputs.critical_count != '0'
+        continue-on-error: false
+        env:
+          SECURITY_SLACK_WEBHOOK_URL: ${{ secrets.SECURITY_SLACK_WEBHOOK_URL }}
+          SECURITY_OPS_WEBHOOK_URL: ${{ secrets.SECURITY_OPS_WEBHOOK_URL }}
+          SECURITY_EMAIL_WEBHOOK_URL: ${{ secrets.SECURITY_EMAIL_WEBHOOK_URL }}
+          SECURITY_EMAIL_WEBHOOK_TOKEN: ${{ secrets.SECURITY_EMAIL_WEBHOOK_TOKEN }}
+          WORKFLOW_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          python3 tooling/notify_security.py \
+            --report unified-report/security-report.json \
+            --workflow-url "$WORKFLOW_URL"
+      - name: Enforce Critical policy
+        if: steps.evaluate.outputs.critical_count != '0'
+        run: |
+          echo 'Critical vulnerabilities detected; blocking the quality gate and APK build.'
+          exit 1
+
   quality:
     name: Quality gate
     runs-on: ubuntu-latest
-    needs: [fast, integration, coverage, prometheus-rules, security, container-security, snyk, security-report]
+    needs: [fast, integration, coverage, prometheus-rules, security, container-security, snyk, security-report, security-notify]
     if: always()
     steps:
       - name: Require all quality jobs to pass
@@ -377,6 +434,7 @@ jobs:
           CONTAINER_SECURITY_RESULT: ${{ needs.container-security.result }}
           SNYK_RESULT: ${{ needs.snyk.result }}
           SECURITY_REPORT_RESULT: ${{ needs.security-report.result }}
+          SECURITY_NOTIFY_RESULT: ${{ needs.security-notify.result }}
         run: |
           set -euo pipefail
           echo "fast=${FAST_RESULT}"
@@ -387,6 +445,7 @@ jobs:
           echo "container-security=${CONTAINER_SECURITY_RESULT}"
           echo "snyk=${SNYK_RESULT}"
           echo "security-report=${SECURITY_REPORT_RESULT}"
+          echo "security-notify=${SECURITY_NOTIFY_RESULT}"
           test "$FAST_RESULT" = success
           test "$INTEGRATION_RESULT" = success
           test "$COVERAGE_RESULT" = success
@@ -395,6 +454,7 @@ jobs:
           test "$CONTAINER_SECURITY_RESULT" = success
           test "$SNYK_RESULT" = success || test "$SNYK_RESULT" = skipped
           test "$SECURITY_REPORT_RESULT" = success
+          test "$SECURITY_NOTIFY_RESULT" = success
 
   build:
     name: Build and publish APK

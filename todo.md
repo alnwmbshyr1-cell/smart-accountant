@@ -476,3 +476,11 @@
 - [x] إضافة ملخص إلى GITHUB_STEP_SUMMARY ورفع التقرير كـartifact قصير الاحتفاظ
 - [x] إضافة اختبار parser للتقرير يمنع التسريب ويعالج SARIF الناقص
 - [x] تحديث المهارة بدليل GitHub Security وREST API وإعادة التشغيل
+
+
+## Critical Security Notifications
+- [x] إضافة أداة تقييم التقرير الموحد وإرسال تنبيه Critical إلى Slack أو البريد
+- [x] تمرير القنوات عبر GitHub Secrets مع منع أي قيمة افتراضية أو تسجيل للسر
+- [x] ربط الإخطار ببوابة الجودة ومنع النشر عند وجود Critical
+- [x] إضافة اختبارات no-critical وcritical وredaction وفشل القناة
+- [x] تحديث المهارة بدليل التشغيل والتدوير والـdeduplication
