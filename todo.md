@@ -420,3 +420,11 @@
 - [x] إضافة اختبار Content-Type واسم metric ورفض/قبول scrape token
 - [x] تحديث المهارة وREADME بممارسات promtool والتحقق الإنتاجي
 - [ ] تشغيل promtool في CI أو بيئة Prometheus فعلية؛ غير متوفر محلياً في هذه الجولة
+
+
+## Grafana Dashboard Provisioning
+- [x] إنشاء Dashboard JSON قابل للاستيراد يعرض مقاييس Smart Accountant الأساسية
+- [x] إضافة provisioning لمصدر Prometheus واللوحة دون أسرار أو معرفات ثابتة
+- [x] إضافة اختبارات بنية JSON ووجود PromQL للمقاييس الفعلية
+- [x] تحديث المهارة بدليل الاستيراد والتشغيل والتنبيهات
+- [x] توثيق أن التحقق النهائي يحتاج Grafana/Prometheus فعليين أو promtool في CI
