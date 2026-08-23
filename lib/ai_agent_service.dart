@@ -1,18 +1,26 @@
 import 'dart:async';
-import 'package:flutter_tts/flutter_tts.dart';
 import 'package:porcupine_flutter/porcupine_manager.dart';
 import 'dart:convert';
 
-import 'services/vosk_service.dart';
+import 'services/audio_ports.dart';
 import 'database_service.dart';
 import 'services/gemini_service.dart';
 import 'yemeni_dictionary.dart';
 import 'ai_agent_parser.dart';
 
 class AiAgentService {
-  AiAgentService({GeminiService? gemini}) : _gemini = gemini ?? GeminiService();
+  AiAgentService({
+    GeminiService? gemini,
+    VoskServicePort? voskService,
+    TtsPort? tts,
+    DelayPort? delay,
+  })  : _gemini = gemini ?? GeminiService(),
+        _voskService = voskService ?? ProductionVoskServicePort(),
+        _tts = tts ?? ProductionTtsPort(),
+        _delay = delay ?? const ProductionDelayPort();
 
-  final FlutterTts _tts = FlutterTts();
+  final TtsPort _tts;
+  final DelayPort _delay;
   final DatabaseService _db = DatabaseService();
   final GeminiService _gemini;
 
@@ -24,7 +32,7 @@ class AiAgentService {
   bool _porcupineActive = false;
   Timer? _commandTimer;
   String _commandText = '';
-  final VoskService _voskService = VoskService();
+  final VoskServicePort _voskService;
   StreamSubscription<String>? _partialSubscription;
   StreamSubscription<String>? _resultSubscription;
   PorcupineManager? _porcupineManager;
@@ -230,9 +238,9 @@ class AiAgentService {
         if (text.isNotEmpty) _commandText = text;
       });
       await service.start();
-      await Future<void>.delayed(const Duration(seconds: 10));
+      await _delay.wait(const Duration(seconds: 10));
       await service.stop();
-      final finalRaw = await _voskService.recognizer!.getFinalResult();
+      final finalRaw = await _voskService.getFinalResult();
       final finalText = _extractVoskText(finalRaw).trim();
       if (finalText.isNotEmpty) _commandText = finalText;
       await _resultSubscription?.cancel();
