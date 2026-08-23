@@ -86,6 +86,7 @@ jobs:
         run: flutter pub get
       - name: Run full suite and coverage gate
         run: ./tooling/ci_local.sh coverage
+
       - name: Generate coverage summary
         if: always()
         shell: bash
@@ -112,6 +113,31 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+  prometheus-rules:
+    name: Prometheus alert rules
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Validate Prometheus alert rules with promtool
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            --volume "$GITHUB_WORKSPACE/backend:/work:ro" \
+            --workdir /work \
+            prom/prometheus:v3.5.0 \
+            promtool test rules ops/prometheus/tests/smart-accountant-alerts.test.yml
+      - name: Validate Alertmanager configuration with amtool
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            --volume "$GITHUB_WORKSPACE/backend:/work:ro" \
+            --workdir /work \
+            prom/alertmanager:v0.28.1 \
+            amtool check-config ops/alertmanager/alertmanager.yml
   security:
     name: Security scanning
     runs-on: ubuntu-latest
@@ -148,7 +174,7 @@ jobs:
   quality:
     name: Quality gate
     runs-on: ubuntu-latest
-    needs: [fast, integration, coverage, security]
+    needs: [fast, integration, coverage, prometheus-rules, security]
     if: always()
     steps:
       - name: Require all quality jobs to pass
@@ -156,16 +182,19 @@ jobs:
           FAST_RESULT: ${{ needs.fast.result }}
           INTEGRATION_RESULT: ${{ needs.integration.result }}
           COVERAGE_RESULT: ${{ needs.coverage.result }}
+          PROM_RULES_RESULT: ${{ needs.prometheus-rules.result }}
           SECURITY_RESULT: ${{ needs.security.result }}
         run: |
           set -euo pipefail
           echo "fast=${FAST_RESULT}"
           echo "integration=${INTEGRATION_RESULT}"
           echo "coverage=${COVERAGE_RESULT}"
+          echo "prometheus-rules=${PROM_RULES_RESULT}"
           echo "security=${SECURITY_RESULT}"
           test "$FAST_RESULT" = success
           test "$INTEGRATION_RESULT" = success
           test "$COVERAGE_RESULT" = success
+          test "$PROM_RULES_RESULT" = success
           test "$SECURITY_RESULT" = success
 
   build:

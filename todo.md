@@ -436,3 +436,11 @@
 - [x] إبقاء Webhook وSlack secrets خارج Git باستخدام secret files أو environment
 - [x] إضافة اختبار بنية قواعد التنبيه وإجراء dry-run آمن؛ الاختبار المحلي يثبت العقد، وamtool يحتاج CI/staging
 - [x] تحديث مهارة Smart Accountant بتشغيل Alertmanager واختبار recovery
+
+
+## Promtool Alert Rule Unit Tests
+- [x] إنشاء ملف promtool test rules لقاعدة 5xx وسلاسل زمنية اصطناعية
+- [x] تغطية حالات firing وpending وresolved وعدم إطلاق التنبيه تحت العتبة
+- [x] إضافة فحص promtool إلى CI مع تثبيت نسخة Prometheus بشكل حتمي
+- [x] تحديث المهارة بدليل promtool وقراءة نتائج الاختبار
+- [x] توثيق وتشغيل مسار التحقق؛ promtool غير مثبت محلياً ويُشغّل داخل CI عبر حاوية رسمية
