@@ -37,6 +37,27 @@ class WeeklySecurityReportTests(unittest.TestCase):
         self.assertEqual(summary["avg_duration_ms"], 20.0)
         self.assertIn("HTTP 503", summary["top_errors"])
 
+    def test_average_duration_ignores_missing_and_invalid_values(self):
+        summary = weekly_security_report.summarize([
+            {"status": "202", "duration_ms": 10},
+            {"status": "202", "duration_ms": "not-a-number"},
+            {"status": "202"},
+            {"status": "202", "duration_ms": 30},
+        ])
+        self.assertEqual(summary["avg_duration_ms"], 20.0)
+
+    def test_cutoff_is_inclusive_and_events_without_timestamp_are_ignored(self):
+        now = datetime(2026, 8, 24, 10, 0, tzinfo=timezone.utc)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "events.jsonl"
+            path.write_text("\n".join([
+                json.dumps({"timestamp": "2026-08-17T10:00:00Z", "status": "202"}),
+                json.dumps({"timestamp": "2026-08-17T09:59:59Z", "status": "202"}),
+                json.dumps({"status": "202"}),
+            ]), encoding="utf-8")
+            events = weekly_security_report.load_events(str(path), now)
+        self.assertEqual(len(events), 1)
+
     def test_markdown_is_bounded_and_has_no_raw_event_message(self):
         markdown = weekly_security_report.render_markdown({
             "period_days": 7,
