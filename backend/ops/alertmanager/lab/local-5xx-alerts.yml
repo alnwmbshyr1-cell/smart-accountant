@@ -16,3 +16,21 @@ groups:
           summary: Local Smart Accountant 5xx rate is high
           description: The local fixture has exceeded 5% 5xx responses for 45 seconds.
           runbook: https://runbooks.example.com/smart-accountant/local-5xx
+
+
+      - alert: SmartAccountantLocalHighP99Latency
+        expr: |
+          histogram_quantile(0.99,
+            sum by (route, le) (
+              rate(smart_accountant_http_request_duration_seconds_bucket{job="smart-accountant-backend"}[1m])
+            )
+          ) > 0.5
+        for: 45s
+        labels:
+          severity: warning
+          environment: local
+          team: platform
+        annotations:
+          summary: Local Smart Accountant p99 latency is above 500ms for {{ $labels.route }}
+          description: The local fixture has exceeded 500ms p99 latency for 45 seconds.
+          runbook: https://runbooks.example.com/smart-accountant/local-p99

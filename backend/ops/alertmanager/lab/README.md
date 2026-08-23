@@ -81,3 +81,16 @@ docker run --rm -v "$PWD:/work:ro" -w /work --entrypoint /bin/promtool prom/prom
 docker compose -f docker-compose.yml down
 rm -rf lab/prometheus-data lab/alertmanager-data lab/received/*.json
 ```
+
+
+## اختبار تكامل p99 وAlertmanager
+
+يشغل `tooling/test_p99_alert_integration.sh` المختبر المحلي، يضبط fixture على latency مقدارها ثانية واحدة، وينتظر الحالة `pending` ثم `firing`، ويتحقق من وصول إخطار firing إلى `lab/received`. بعد ذلك يعيد latency إلى 100ms ويتحقق من `inactive` ووصول إخطار `resolved`.
+
+```bash
+cd /path/to/smart-accountant
+chmod +x tooling/test_p99_alert_integration.sh
+timeout 240s tooling/test_p99_alert_integration.sh
+```
+
+القاعدة المحلية تستخدم `for: 45s` لتقليل زمن الاختبار، بينما قاعدة الإنتاج تستخدم `for: 5m`. لا تستخدم fixture أو منافذ المختبر في الإنتاج. إذا فشل الاختبار، افحص `docker compose logs prometheus alertmanager webhook-receiver` وملفات `lab/received/` قبل تنفيذ التنظيف. يعتمد التحقق الدقيق من حالة Prometheus على `tooling/read_prom_alert_state.py`.

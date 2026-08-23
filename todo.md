@@ -586,3 +586,10 @@
 - [x] ربط alert بـAlertmanager receiver مع labels وannotations آمنة
 - [x] إضافة اختبار promtool لحالة firing وinactive
 - [x] تحديث المهارة والتحقق ثم دفع التعديل
+
+
+## Live P99 Alert Integration Test
+- [x] إضافة fixture latency يرفع p99 فوق 500ms
+- [x] إضافة runner يثبت pending ثم firing ثم resolved عبر Prometheus وAlertmanager
+- [x] التحقق من وصول payload إلى مستقبل Alertmanager المحلي
+- [x] تحديث المهارة والتوثيق ثم التحقق والدفع

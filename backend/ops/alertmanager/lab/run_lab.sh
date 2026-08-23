@@ -16,7 +16,6 @@ echo 'Services:'
 echo '  Prometheus:  http://localhost:19090'
 echo '  Alertmanager: http://localhost:19093'
 echo '  Webhook:      http://localhost:18080/alertmanager'
-e
 echo
 echo 'Keep 0.10 for approximately 60 seconds to observe the alert become firing.'
 echo 'Then run: printf "0.01\\n" > lab/state/error_ratio'
