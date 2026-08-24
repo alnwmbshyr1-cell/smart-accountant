@@ -895,3 +895,10 @@
 - [x] تشغيل integration harness والتحقق من firing وresolved وrouting
 - [x] رفع logs وJSON artifacts عند الفشل مع timeout وcleanup مضمون
 - [x] تحديث المهارة والتوثيق واختبارات Workflow والتحقق ومزامنة Pull Request
+
+
+## Alertmanager required branch check
+- [x] تحديد اسم check النهائي ومرجع الفرع المحمي
+- [x] إضافة إعداد Branch Protection أو Ruleset يمنع الدمج عند فشل الاختبار
+- [x] إضافة تحقق آلي من القاعدة وتوثيق rollback والصلاحيات
+- [x] تحديث المهارة والتوثيق والتحقق ومزامنة Pull Request
