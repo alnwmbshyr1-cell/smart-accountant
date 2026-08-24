@@ -1,0 +1,13 @@
+# Security-sensitive paths require an explicit accountable reviewer.
+# Set repository variable SECURITY_TEAM_SLUG to an organization team when one exists.
+# Until then, the repository owner is the enforced reviewer for these paths.
+
+/.github/workflows/ @alnwmbshyr1-cell
+/backend/ops/ @alnwmbshyr1-cell
+/backend/src/ @alnwmbshyr1-cell
+/tooling/ @alnwmbshyr1-cell
+/supabase/ @alnwmbshyr1-cell
+
+# Keep production CI and security policy changes under the same review owner.
+/.github/main-branch-protection.json @alnwmbshyr1-cell
+/.github/pull_request_template.md @alnwmbshyr1-cell

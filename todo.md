@@ -727,3 +727,10 @@
 - [x] إصلاح تعارض Flutter SDK مع pubspec والـlockfile
 - [x] إصلاح migration وخطة pgTAP ومسار Flutter integration test
 - [x] تحديث المهارة والتوثيق والتحقق
+
+
+## Security Review PR Escalation
+- [x] إضافة قالب Pull Request يتضمن شرط مراجعة الأمن عند فشل Quality gate
+- [x] إضافة CODEOWNERS لمسارات الأمن وWorkflow وBackend
+- [x] إضافة Workflow لتصعيد PR الفاشل إلى فريق الأمن دون أسرار أو صلاحيات زائدة
+- [x] إضافة اختبارات القالب والتصعيد وتحديث المهارة والتحقق والدفع
