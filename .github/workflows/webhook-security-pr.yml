@@ -12,6 +12,8 @@ on:
 permissions:
   contents: read
   security-events: write
+  pull-requests: write
+  issues: write
 
 jobs:
   sast:
@@ -69,6 +71,41 @@ jobs:
             trivy-webhook.sarif
           if-no-files-found: ignore
           retention-days: 7
+      - name: Generate safe PR SAST summary
+        if: always()
+        run: |
+          python3 tooling/sarif_pr_summary.py sast-pr-summary.md semgrep.sarif trivy-webhook.sarif
+      - name: Upload PR SAST summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: webhook-sast-summary-${{ github.run_id }}
+          path: sast-pr-summary.md
+          retention-days: 7
+      - name: Update SAST Pull Request comment
+        if: always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/github-script@v7
+        env:
+          SUMMARY_FILE: sast-pr-summary.md
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- smart-accountant-sast-summary -->';
+            const body = fs.readFileSync(process.env.SUMMARY_FILE, 'utf8');
+            const issue_number = context.issue.number;
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number,
+              per_page: 100
+            });
+            const existing = comments.find(comment => comment.user?.type === 'Bot' && comment.body?.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ owner: context.repo.owner, repo: context.repo.repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number, body });
+            }
 
   dast:
     name: Safe local DAST for webhook receiver

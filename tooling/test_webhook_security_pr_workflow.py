@@ -32,6 +32,17 @@ class WebhookSecurityPrWorkflowTests(unittest.TestCase):
         self.assertIn("return 1 if blocking else 0", CHECKER)
         self.assertIn('"8080:8080"', COMPOSE)
 
+    def test_sarif_summary_and_pr_comment_are_safe_and_deduplicated(self):
+        self.assertIn("sarif_pr_summary.py", WORKFLOW)
+        self.assertIn("actions/github-script@v7", WORKFLOW)
+        self.assertIn("pull-requests: write", WORKFLOW)
+        self.assertIn("issues: write", WORKFLOW)
+        self.assertIn("smart-accountant-sast-summary", WORKFLOW)
+        self.assertIn("github.paginate", WORKFLOW)
+        self.assertIn("updateComment", WORKFLOW)
+        self.assertIn("createComment", WORKFLOW)
+        self.assertIn("head.repo.full_name == github.repository", WORKFLOW)
+
     def test_cleanup_and_diagnostics_are_always_run(self):
         self.assertIn("if: always()", WORKFLOW)
         self.assertIn("Upload DAST artifacts", WORKFLOW)
