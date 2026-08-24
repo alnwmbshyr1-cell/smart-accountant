@@ -902,3 +902,10 @@
 - [x] إضافة إعداد Branch Protection أو Ruleset يمنع الدمج عند فشل الاختبار
 - [x] إضافة تحقق آلي من القاعدة وتوثيق rollback والصلاحيات
 - [x] تحديث المهارة والتوثيق والتحقق ومزامنة Pull Request
+
+
+## GitHub required-check failure notifications
+- [x] تحديد أحداث GitHub المطلوبة وفحص Required Status Checks المستهدف
+- [x] إضافة مستقبل Webhook يتحقق من توقيع GitHub ويرشح الفشل
+- [x] إضافة Slack notifier مع redaction وidempotency وretry
+- [x] إضافة اختبارات محلية وتحديث المهارة والتوثيق والتحقق ومزامنة Pull Request
