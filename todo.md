@@ -692,3 +692,10 @@
 - [x] اختبار firing وresolved والتحقق من payload المنقح
 - [x] رفع logs وartifacts عند الفشل فقط دون أسرار
 - [x] تحديث المهارة والتوثيق والتحقق والدفع
+
+
+## PR Webhook SAST and DAST
+- [x] إضافة SAST وفحص dependencies داخل Pull Request
+- [x] إضافة DAST محدود على مختبر Webhook محلي غير إنتاجي
+- [x] رفع SARIF وartifacts منقحة مع quality gates للثغرات العالية
+- [x] تحديث المهارة والتوثيق والتحقق والدفع

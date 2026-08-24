@@ -1,0 +1,121 @@
+name: Webhook Security PR
+
+on:
+  pull_request:
+    paths:
+      - 'backend/**'
+      - 'tooling/**'
+      - 'backend/ops/alert-lab/**'
+      - '.github/workflows/webhook-security-pr.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  sast:
+    name: SAST and dependency security
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run Python compile and policy tests
+        run: |
+          python3 -m py_compile tooling/*.py backend/ops/alert-lab/*.py
+          python3 -m unittest tooling/test_webhook_receiver_security.py tooling/test_deadlock_alerts_replay_policy.py
+      - name: Run Semgrep SAST
+        uses: semgrep/semgrep-action@v1
+        continue-on-error: false
+        with:
+          config: >-
+            p/python
+            p/javascript
+            p/secrets
+          generateSarif: true
+      - name: Upload Semgrep SARIF
+        if: always() && github.event.pull_request.head.repo.full_name == github.repository && hashFiles('semgrep.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: semgrep.sarif
+          category: webhook-sast
+      - name: Run Trivy filesystem scan
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,misconfig,secret
+          severity: HIGH,CRITICAL
+          format: sarif
+          output: trivy-webhook.sarif
+          exit-code: '1'
+      - name: Upload Trivy SARIF
+        if: always() && github.event.pull_request.head.repo.full_name == github.repository && hashFiles('trivy-webhook.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-webhook.sarif
+          category: webhook-trivy
+      - name: Upload SAST reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: webhook-sast-${{ github.run_id }}
+          path: |
+            semgrep.sarif
+            trivy-webhook.sarif
+          if-no-files-found: ignore
+          retention-days: 7
+
+  dast:
+    name: Safe local DAST for webhook receiver
+    needs: sast
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate and start local webhook lab
+        run: |
+          docker compose -f backend/ops/alert-lab/docker-compose.yml config --quiet
+          mkdir -p backend/ops/alert-lab/received
+          docker compose -f backend/ops/alert-lab/docker-compose.yml up -d receiver
+      - name: Run ZAP baseline against local receiver
+        run: |
+          set -euo pipefail
+          mkdir -p .zap
+          docker run --rm --network host \
+            -v "$PWD/.zap:/zap/wrk" \
+            ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
+            -t http://127.0.0.1:8080/healthz \
+            -J /zap/wrk/zap-report.json \
+            -r /zap/wrk/zap-report.html \
+            -I || true
+          test -s .zap/zap-report.json
+          cp .zap/zap-report.json zap-report.json
+          cp .zap/zap-report.html zap-report.html || true
+      - name: Enforce DAST high/critical policy
+        run: python3 tooling/check_zap_report.py zap-report.json
+      - name: Assert local receiver redacts payloads
+        run: |
+          curl -fsS -X POST http://127.0.0.1:8080/slack \
+            -H 'Content-Type: application/json' \
+            --data '{"status":"firing","token":"Bearer should-not-persist"}'
+          ! grep -Eiq 'bearer|authorization|api[_-]?key|password|secret' \
+            backend/ops/alert-lab/received/events.jsonl
+      - name: Upload DAST artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: webhook-dast-${{ github.run_id }}
+          path: |
+            zap-report.json
+            zap-report.html
+            backend/ops/alert-lab/received/
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Tear down local lab
+        if: always()
+        run: docker compose -f backend/ops/alert-lab/docker-compose.yml down -v

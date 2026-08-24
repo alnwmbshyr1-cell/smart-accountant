@@ -9,6 +9,8 @@ services:
 
   receiver:
     image: python:3.12-alpine
+    ports:
+      - "8080:8080"
     working_dir: /app
     command: ["python", "webhook_receiver.py"]
     volumes:
