@@ -19,6 +19,7 @@ class State:
         self.secret = secret.encode()
         self.lock = threading.Lock()
         self.events: list[dict[str, Any]] = []
+        self.memory_rss = 100000000
 
     def record(self, channel: str, body: bytes, headers: Any) -> None:
         item = {
@@ -46,10 +47,25 @@ class Handler(BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length", "0"))
         body = self.rfile.read(length)
         state: State = self.server.state  # type: ignore[attr-defined]
+        if self.path == "/metrics-state":
+            try:
+                value = int(json.loads(body.decode("utf-8"))["memory_rss_bytes"])
+            except (KeyError, TypeError, ValueError, json.JSONDecodeError):
+                self.send_error(400, "memory_rss_bytes is required")
+                return
+            with state.lock:
+                state.memory_rss = value
+            self.send_response(204)
+            self.end_headers()
+            return
         if self.path == "/webhook":
             signature = self.headers.get("X-Synthetic-Signature", "")
             expected = hmac.new(state.secret, body, hashlib.sha256).hexdigest()
-            if not hmac.compare_digest(signature, expected):
+            unsigned_allowed = os.environ.get("ALLOW_UNSIGNED_SYNTHETIC", "false").lower() == "true"
+            if not signature and not unsigned_allowed:
+                self.send_error(401, "missing synthetic signature")
+                return
+            if signature and not hmac.compare_digest(signature, expected):
                 self.send_error(401, "invalid synthetic signature")
                 return
             channel = "webhook"
@@ -65,6 +81,16 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(b'{"accepted":true}')
 
     def do_GET(self) -> None:  # noqa: N802
+        state: State = self.server.state  # type: ignore[attr-defined]
+        if self.path == "/metrics":
+            with state.lock:
+                value = state.memory_rss
+            body = f"# HELP otelcol_process_memory_rss_bytes Collector RSS for synthetic testing\\n# TYPE otelcol_process_memory_rss_bytes gauge\\notelcol_process_memory_rss_bytes {value}\\n".encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain; version=0.0.4")
+            self.end_headers()
+            self.wfile.write(body)
+            return
         if self.path != "/received":
             self.send_error(404)
             return

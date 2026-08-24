@@ -881,3 +881,10 @@
 - [x] إضافة Synthetic runner لاختبارات firing وresolved وdeduplication
 - [x] إضافة اختبارات payload وHMAC وredaction وtimeouts
 - [x] تحديث المهارة والتوثيق والتحقق ومزامنة Pull Request
+
+
+## Alertmanager integration verification
+- [x] تعريف Compose محلي لـPrometheus وAlertmanager وMock receiver
+- [x] إضافة اختبار تكاملي لـfiring وresolved وrouting
+- [x] إضافة تحقق inhibition وgrouping وغياب أسرار الإنتاج
+- [x] تحديث المهارة والتوثيق والتحقق ومزامنة Pull Request
