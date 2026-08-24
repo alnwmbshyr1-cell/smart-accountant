@@ -1,0 +1,40 @@
+groups:
+  - name: alert-lab
+    interval: 5s
+    rules:
+      - alert: LabK6P95LatencyHigh
+        expr: |
+          histogram_quantile(0.95,
+            sum by (testid, le) (
+              rate(k6_http_req_duration_seconds_bucket{testid!=""}[30s])
+            )
+          ) > 0.75
+          and on (testid)
+          sum by (testid) (rate(k6_http_reqs_total{testid!=""}[30s])) > 0
+        for: 10s
+        labels:
+          severity: warning
+          category: load_test
+        annotations:
+          summary: "Lab p95 is above 750ms for {{ $labels.testid }}"
+          description: "Synthetic alert-lab metrics exceeded the p95 gate."
+
+      - alert: LabDeadlockBurst
+        expr: increase(smart_accountant_db_deadlocks_total[30s]) >= 3
+        for: 5s
+        labels:
+          severity: critical
+          category: database
+        annotations:
+          summary: "Lab deadlock burst detected"
+          description: "Synthetic deadlock counter reached the lab threshold."
+
+      - alert: LabStagingTestFailed
+        expr: increase(smart_accountant_staging_test_failures_total[30s]) > 0
+        for: 5s
+        labels:
+          severity: high
+          category: staging
+        annotations:
+          summary: "Lab staging test failed"
+          description: "Synthetic staging failure counter increased."

@@ -678,3 +678,10 @@
 - [x] ربط Alertmanager بتنبيه Slack مع deduplication وresolved notifications
 - [x] إضافة تشغيل k6 عبر remote write وملخص فشل فوري في GitHub Actions
 - [x] إضافة اختبارات المراقبة وتحديث المهارة والتحقق والدفع
+
+
+## Local Prometheus Alertmanager Slack Lab
+- [x] إضافة Compose محلي بمقاييس اصطناعية ومستقبل Webhook منقح
+- [x] اختبار firing وresolved وتنبيه p95 وidempotency للـfingerprint
+- [x] توثيق أوامر التشغيل وعدم استخدام Slack الإنتاجي
+- [x] تحديث المهارة والتحقق والدفع
