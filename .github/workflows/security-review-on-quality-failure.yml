@@ -66,7 +66,8 @@ jobs:
     if: >-
       needs.detect-quality-failure.outputs.quality_failed == 'true' &&
       needs.detect-quality-failure.outputs.pr_number != '' &&
-      needs.detect-quality-failure.outputs.same_repo == 'true'
+      needs.detect-quality-failure.outputs.same_repo == 'true' &&
+      env.ACT_LOCAL != 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Request configured security reviewer and add label

@@ -734,3 +734,10 @@
 - [x] إضافة CODEOWNERS لمسارات الأمن وWorkflow وBackend
 - [x] إضافة Workflow لتصعيد PR الفاشل إلى فريق الأمن دون أسرار أو صلاحيات زائدة
 - [x] إضافة اختبارات القالب والتصعيد وتحديث المهارة والتحقق والدفع
+
+
+## Local workflow_run Simulation with act
+- [x] إضافة payloads اصطناعية لنجاح وفشل workflow_run وfork PR
+- [x] إضافة أمر act محلي يمنع أي API writes أو أسرار حقيقية
+- [x] اختبار قرار التصعيد وmarker وsafe no-write path
+- [x] تحديث المهارة والتوثيق والتحقق والدفع

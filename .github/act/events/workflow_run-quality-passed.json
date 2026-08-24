@@ -1,0 +1,15 @@
+{
+  "action": "completed",
+  "workflow_run": {
+    "id": 999002,
+    "name": "Smart Accountant CI/CD",
+    "event": "pull_request",
+    "status": "completed",
+    "conclusion": "success",
+    "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "head_branch": "feature/clean",
+    "pull_requests": [{"number": 502, "head": {"repo": {"full_name": "alnwmbshyr1-cell/smart-accountant"}}}]
+  },
+  "repository": {"full_name": "alnwmbshyr1-cell/smart-accountant", "default_branch": "main"},
+  "sender": {"login": "act-test"}
+}
