@@ -839,3 +839,10 @@
 - [x] إضافة Workflow ينتظر النشر ويشغل KEDA Load Test
 - [x] إضافة تحقق scale-up وscale-down ورفع artifacts عند الفشل
 - [x] تحديث المهارة والتوثيق واختبارات Workflow والتحقق ومزامنة Pull Request
+
+
+## Redis outage chaos verification
+- [x] تحديد تجربة Redis outage وحدود namespace والوقت ومعايير النجاح
+- [x] إضافة مشغّل Chaos محمي يعزل Redis ويضمن الاستعادة
+- [x] إضافة Workflow واختبارات تمنع التشغيل خارج Staging وتجمع الأدلة
+- [x] تحديث المهارة والتوثيق وGrafana والتحقق ومزامنة Pull Request

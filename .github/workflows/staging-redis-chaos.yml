@@ -1,0 +1,99 @@
+name: Staging Redis chaos verification
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_chaos:
+        description: "Explicitly authorize the controlled Redis outage in staging"
+        required: true
+        default: false
+        type: boolean
+      fault_seconds:
+        description: "Redis outage duration"
+        required: false
+        default: "30"
+        type: string
+      recovery_timeout:
+        description: "Maximum recovery wait"
+        required: false
+        default: "180"
+        type: string
+
+concurrency:
+  group: staging-redis-chaos
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  redis-chaos:
+    name: Verify Redis outage isolation and recovery
+    if: ${{ inputs.confirm_chaos == true }}
+    runs-on: ubuntu-latest
+    environment: staging-chaos
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure staging kubeconfig
+        env:
+          KUBE_CONFIG_B64: ${{ secrets.STAGING_KUBECONFIG_B64 }}
+        run: |
+          set -euo pipefail
+          test -n "$KUBE_CONFIG_B64"
+          install -d -m 700 "$HOME/.kube"
+          printf '%s' "$KUBE_CONFIG_B64" | base64 --decode > "$HOME/.kube/config"
+          chmod 600 "$HOME/.kube/config"
+          kubectl config current-context
+
+      - name: Verify staging target and Redis baseline
+        env:
+          K8S_NAMESPACE: smart-accountant-staging
+          REDIS_DEPLOYMENT: redis
+        run: |
+          set -euo pipefail
+          case "$K8S_NAMESPACE" in *staging*) ;; *) exit 1 ;; esac
+          kubectl -n "$K8S_NAMESPACE" get deployment "$REDIS_DEPLOYMENT"
+          kubectl -n "$K8S_NAMESPACE" get deployment security-webhook-worker
+
+      - name: Run controlled Redis chaos experiment
+        env:
+          K8S_NAMESPACE: smart-accountant-staging
+          REDIS_DEPLOYMENT: redis
+          FAULT_SECONDS: ${{ inputs.fault_seconds }}
+          RECOVERY_TIMEOUT: ${{ inputs.recovery_timeout }}
+          METRICS_URL: ${{ secrets.STAGING_METRICS_URL }}
+        run: |
+          set -euo pipefail
+          python3 tooling/staging_redis_chaos.py \
+            --namespace "$K8S_NAMESPACE" \
+            --redis-deployment "$REDIS_DEPLOYMENT" \
+            --fault-seconds "$FAULT_SECONDS" \
+            --recovery-timeout "$RECOVERY_TIMEOUT" \
+            --metrics-url "$METRICS_URL" \
+            --confirm-staging-chaos \
+            --execute
+
+      - name: Collect chaos diagnostics
+        if: always()
+        env:
+          K8S_NAMESPACE: smart-accountant-staging
+        run: |
+          set +e
+          kubectl -n "$K8S_NAMESPACE" get pods -o wide > artifacts-chaos-pods.txt
+          kubectl -n "$K8S_NAMESPACE" get events --sort-by=.lastTimestamp > artifacts-chaos-events.txt
+          kubectl -n "$K8S_NAMESPACE" describe deployment redis > artifacts-chaos-redis.txt
+          kubectl -n "$K8S_NAMESPACE" describe deployment security-webhook-worker > artifacts-chaos-worker.txt
+
+      - name: Upload chaos evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: redis-chaos-${{ github.run_id }}
+          path: |
+            artifacts/redis-chaos-observations.jsonl
+            artifacts-chaos-*.txt
+          if-no-files-found: warn
+          retention-days: 14
