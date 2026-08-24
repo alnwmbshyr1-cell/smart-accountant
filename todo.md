@@ -804,3 +804,10 @@
 - [x] إضافة مسارات Alertmanager لـPagerDuty وWebhook مع resolved
 - [x] إضافة اختبارات routing وpayload دون اتصال خارجي
 - [x] تحديث المهارة والتوثيق والتحقق ومزامنة Pull Request
+
+
+## Grafana Redis Stream and Circuit Breaker dashboard
+- [x] تحديد panels ومقاييس Redis Stream وCircuit Breaker
+- [x] إنشاء Dashboard JSON قابل للاستيراد في Grafana
+- [x] إضافة اختبارات JSON وPromQL وعدم استخدام labels عالية cardinality
+- [x] تحديث المهارة والتوثيق والتحقق ومزامنة Pull Request
