@@ -741,3 +741,10 @@
 - [x] إضافة أمر act محلي يمنع أي API writes أو أسرار حقيقية
 - [x] اختبار قرار التصعيد وmarker وsafe no-write path
 - [x] تحديث المهارة والتوثيق والتحقق والدفع
+
+
+## act Slack Notification Integration
+- [x] إضافة اختبار تكامل يستقبل firing وresolved من Alertmanager محلي
+- [x] التحقق من deduplication وtestid وredaction داخل payloads
+- [x] ربط التشغيل مع fixtures وact دون Slack أو GitHub API حقيقي
+- [x] تحديث المهارة والتوثيق والتحقق والدفع

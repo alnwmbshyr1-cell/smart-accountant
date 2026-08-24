@@ -1,9 +1,10 @@
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 import json
+import os
 import re
 
-OUT = Path("/data/events.jsonl")
+OUT = Path(os.environ.get("ALERT_LAB_EVENTS_PATH", "/data/events.jsonl"))
 SECRET_RE = re.compile(r"(?i)(bearer\s+|token|api[_-]?key|secret|password|webhook)[^\s,;]*")
 
 class Handler(BaseHTTPRequestHandler):
