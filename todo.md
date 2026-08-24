@@ -811,3 +811,10 @@
 - [x] إنشاء Dashboard JSON قابل للاستيراد في Grafana
 - [x] إضافة اختبارات JSON وPromQL وعدم استخدام labels عالية cardinality
 - [x] تحديث المهارة والتوثيق والتحقق ومزامنة Pull Request
+
+
+## Redis Stream and Circuit Breaker load lab
+- [x] تحديد سيناريوهات الحمل وحدود التشغيل الآمن خارج الإنتاج
+- [x] إضافة سكربت Load Testing قابل للضبط يحفز Circuit Open
+- [x] إضافة تحليل نتائج واختبارات تمنع استهداف الإنتاج أو labels عالية cardinality
+- [x] تحديث المهارة والتوثيق ولوحة Grafana والتحقق ومزامنة Pull Request
