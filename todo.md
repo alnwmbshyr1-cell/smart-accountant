@@ -720,3 +720,10 @@
 - [x] إعداد سياسة branch protection لـmain/master مع مراجعة وموافقة
 - [x] إضافة تحقق آلي من حماية الفرع وتوثيق خطوات GitHub
 - [x] تحديث المهارة والتحقق والدفع
+
+
+## CI Quality Gate Diagnosis
+- [x] جمع سجلات GitHub Actions وتحديد الأسباب الجذرية للفشل
+- [x] إصلاح تعارض Flutter SDK مع pubspec والـlockfile
+- [x] إصلاح migration وخطة pgTAP ومسار Flutter integration test
+- [x] تحديث المهارة والتوثيق والتحقق

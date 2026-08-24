@@ -1,0 +1,67 @@
+name: Supabase integration tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  database-and-client-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start local Supabase
+        run: supabase start -x studio
+
+      - name: Reset database and apply migrations
+        run: supabase db reset
+
+      - name: Run pgTAP database tests
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p test-results
+          supabase test db --local 2>&1 | tee test-results/pgtap.tap
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.27.1'
+          channel: stable
+          cache: true
+
+      - name: Flutter dependencies
+        run: flutter pub get
+
+      - name: Flutter integration tests with coverage
+        shell: bash
+        run: |
+          mkdir -p test-results
+          flutter test --coverage --concurrency=1 integration_test/rls_supabase_test.dart \
+            2>&1 | tee test-results/flutter-integration.log
+
+      - name: Upload pgTAP and Flutter reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maqani-integration-reports-${{ github.run_id }}
+          path: |
+            test-results/
+            coverage/lcov.info
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Stop local Supabase
+        if: always()
+        run: supabase stop --no-backup
