@@ -355,3 +355,410 @@
 - [x] اختبارات الأمثلة التسعة والتخزين والحسابات والبيانات غير الصالحة
 - [x] flutter analyze و82 اختباراً ناجحاً وcoverage 80.58%
 - [x] بناء APK v3.0.0 النهائي والتحقق من CI؛ app-release.apk بحجم 92.2MB
+
+
+## Final verification — v3.0.0
+- [x] إصلاح تعارض google_fonts مع Flutter الحالي بإزالة الاستدعاء التنفيذي غير المتوافق مع بقاء الحزمة اختيارية في pubspec
+- [x] تشغيل flutter analyze بنتيجة No issues found
+- [x] تشغيل flutter test --coverage --concurrency=1؛ 104 اختبارات ناجحة
+- [x] توليد coverage/html/index.html وcoverage/lcov.info؛ التغطية الكلية 86.95% (1239/1425)
+- [x] بناء APK Release نهائي؛ build/app/outputs/flutter-apk/app-release.apk بحجم 95.6MB
+- [x] توثيق عدم رفع ملفات النموذج الثنائية الكبيرة ضمن Git والاكتفاء بالأصول المتاحة فعلياً
+- [x] جاهزية commit نهائي للمستودع smart-accountant
+
+## ملاحظات تاريخية
+- [x] تم تجاوز البنود التاريخية الخاصة بمراحل v1/v2 أو استبدالها بتصميم v3 الحالي؛ لا تُعاد دون طلب صريح.
+
+
+## Gemini Backend Proxy Integration
+- [x] إنشاء Backend Node.js/TypeScript مستقل مع Endpoint `/v1/accounting/parse`
+- [x] إضافة Zod للتحقق من الطلب واستجابة Gemini والأنواع والمبالغ والكميات
+- [x] إضافة مصادقة ومحدد معدل ومهلة وإخفاء الأسرار في سجلات Backend
+- [x] نقل استدعاء Gemini من عميل Flutter إلى AccountingBackendClient عبر HTTPS
+- [x] الإبقاء على AiAgentParser كـ fallback أوفلاين عند فشل Backend أو غياب الشبكة
+- [x] إضافة اختبارات HTTP fake لمسارات النجاح والاستجابة غير 200 وtimeout وJSON غير الكائني
+- [x] تشغيل analyze والاختبارات وبناء Backend TypeScript وتوثيق إعدادات التشغيل دون مفتاح داخل Git
+
+
+## Real JWT Authentication and Offline-first Resilience
+- [x] اختيار Supabase افتراضياً مع دعم Firebase Auth وتوثيق متطلبات التوكن
+- [x] استبدال فحص Bearer الشكلي بتحقق JWT حقيقي في Backend
+- [x] ربط هوية المستخدم بالطلب ومنع استخدام توكن منتهي أو جهة إصدار غير موثوقة
+- [ ] ربط عميل Flutter فعلياً بـFirebase/Supabase SDK لتوفير access token وتجديده؛ fallback الشبكة مطبق
+- [x] اختبار Supabase JWT بتوقيع RSA محلياً: التوكن الصحيح، audience الخاطئ، role الخاطئ، والانتهاء؛ واختبار Firebase adapter للـrevocation failure
+- [ ] اختبار حفظ SQLite المحلي وعدم التكرار عند فشل Backend وإعادة المحاولة عبر outbox
+- [x] تحديث دليل التشغيل ونتائج التحقق دون تضمين أسرار حقيقية
+
+
+## Flutter Auth Token Binding
+- [x] تحديث مهارة Smart Accountant لتوثيق ربط Flutter بـFirebase/Supabase access token مع كل طلب
+- [x] إضافة نمط token loader قابل للحقن مع إعادة محاولة واحدة بعد 401؛ ربط SDK الفعلي يبقى اختيارياً لكل المشروع
+- [x] منع إرسال GEMINI_API_KEY من Flutter والحفاظ على fallback المحلي عند فشل الشبكة أو المصادقة
+- [x] إضافة اختبارات عميل تغطي Authorization وغياب التوكن و401 مع refresh وtimeout وfallback؛ 5 اختبارات ناجحة
+
+
+## Supabase End-to-End Integration Tests
+- [x] إضافة اختبار تكامل HTTP يمرر Supabase JWT إلى Backend ثم يعيد JSON محاسبياً مطابقاً للمخطط
+- [x] تشغيل Backend محلياً مع JWKS RSA مزيف وGemini fake دون أسرار إنتاجية
+- [x] اختبار رفض توكن Supabase المنتهي قبل استدعاء Gemini؛ تغطية انقطاع الشبكة و401 وإعادة التوكن موجودة في اختبارات العميل
+- [x] توثيق تشغيل الاختبار في CI وAndroid staging دون تضمين مفاتيح حقيقية
+- [x] تحديث مهارة Smart Accountant بسير عمل اختبارات التكامل والـfixtures
+
+
+## Production Backend Observability
+- [x] إضافة logging منظم بصيغة JSON مع request ID وإخفاء الأسرار والبيانات الحساسة
+- [x] إضافة metrics للصحة ومعدلات الطلبات والأخطاء والمهل وزمن Gemini
+- [x] إضافة health/readiness endpoints مناسبة للتشغيل الإنتاجي
+- [x] إضافة اختبارات observability تمنع تسريب Authorization والنص المحاسبي الكامل؛ الأسرار لا تُقرأ أصلاً من الطلب
+- [x] تحديث مهارة Smart Accountant بممارسات التنبيه والاحتفاظ بالسجلات والاستجابة للحوادث
+
+
+## Prometheus Production Export
+- [x] إضافة prom-client وPrometheus text exposition على `/metrics`
+- [x] الإبقاء على `/metrics.json` للتشخيص الداخلي وحماية المسارين بـMETRICS_SCRAPE_TOKEN الاختياري
+- [x] إضافة prometheus.yml وقواعد تنبيه مع bearer_token_file وHTTPS وlabels منخفضة الكاردينالية
+- [x] إضافة اختبار Content-Type واسم metric ورفض/قبول scrape token
+- [x] تحديث المهارة وREADME بممارسات promtool والتحقق الإنتاجي
+- [ ] تشغيل promtool في CI أو بيئة Prometheus فعلية؛ غير متوفر محلياً في هذه الجولة
+
+
+## Grafana Dashboard Provisioning
+- [x] إنشاء Dashboard JSON قابل للاستيراد يعرض مقاييس Smart Accountant الأساسية
+- [x] إضافة provisioning لمصدر Prometheus واللوحة دون أسرار أو معرفات ثابتة
+- [x] إضافة اختبارات بنية JSON ووجود PromQL للمقاييس الفعلية
+- [x] تحديث المهارة بدليل الاستيراد والتشغيل والتنبيهات
+- [x] توثيق أن التحقق النهائي يحتاج Grafana/Prometheus فعليين أو promtool في CI
+
+
+## Prometheus 5xx Alert Delivery
+- [x] إضافة قاعدة 5xx قابلة للتهيئة مع threshold وfor وlabels مستقرة
+- [x] إضافة إعداد Alertmanager للتجميع والكبت وإرسال Slack أو Webhook
+- [x] إبقاء Webhook وSlack secrets خارج Git باستخدام secret files أو environment
+- [x] إضافة اختبار بنية قواعد التنبيه وإجراء dry-run آمن؛ الاختبار المحلي يثبت العقد، وamtool يحتاج CI/staging
+- [x] تحديث مهارة Smart Accountant بتشغيل Alertmanager واختبار recovery
+
+
+## Promtool Alert Rule Unit Tests
+- [x] إنشاء ملف promtool test rules لقاعدة 5xx وسلاسل زمنية اصطناعية
+- [x] تغطية حالات firing وpending وresolved وعدم إطلاق التنبيه تحت العتبة
+- [x] إضافة فحص promtool إلى CI مع تثبيت نسخة Prometheus بشكل حتمي
+- [x] تحديث المهارة بدليل promtool وقراءة نتائج الاختبار
+- [x] توثيق وتشغيل مسار التحقق؛ promtool غير مثبت محلياً ويُشغّل داخل CI عبر حاوية رسمية
+
+
+## Local Alertmanager Compose Lab
+- [x] إنشاء Docker Compose محلي يربط Prometheus وAlertmanager وWebhook receiver
+- [x] إضافة receiver اختباري يسجل payloads firing وresolved دون أسرار
+- [x] إضافة إعداد Slack اختياري عبر secret file أو environment خارج Git
+- [x] إضافة سكربت تشغيل وتنظيف واختبار health وalert delivery
+- [x] تحديث المهارة بتركيب المختبر وقيود عدم استخدام Slack الإنتاجي محلياً
+
+
+## Alertmanager CI/CD Automation
+- [x] إضافة job مستقل لفحص promtool داخل GitHub Actions بنسخة Prometheus مثبتة
+- [x] إضافة فحص amtool لإعداد Alertmanager داخل نفس المسار
+- [x] ربط job المراقبة ببوابة الجودة لمنع Build وRelease عند الفشل
+- [x] حفظ تقارير وإخفاقات المراقبة كـCI artifacts دون أسرار
+- [x] تحديث المهارة بدليل تشغيل CI وقيود Docker والـsecrets
+
+
+## Container and Dependency Security Scans
+- [x] إضافة Trivy filesystem وdependency scan مع SARIF وthreshold واضح
+- [x] إضافة فحص صور Docker المستخدمة في مختبر Alertmanager بإصدارات مثبتة
+- [x] إضافة فحص Snyk اختياري مشروط بوجود SNYK_TOKEN دون فشل زائف عند غيابه
+- [x] ربط نتائج الفحص ببوابة الجودة وحفظ التقارير دون أسرار
+- [x] تحديث المهارة بوصف سياسة الثغرات وطرق التشغيل المحلي وCI
+
+
+## Unified GitHub Security Report
+- [x] جمع SARIF من Trivy وSnyk مع categories فريدة داخل GitHub Code Scanning
+- [x] توليد تقرير Markdown وJSON موحد حسب الأداة والشدة والمكوّن والحالة
+- [x] إضافة ملخص إلى GITHUB_STEP_SUMMARY ورفع التقرير كـartifact قصير الاحتفاظ
+- [x] إضافة اختبار parser للتقرير يمنع التسريب ويعالج SARIF الناقص
+- [x] تحديث المهارة بدليل GitHub Security وREST API وإعادة التشغيل
+
+
+## Critical Security Notifications
+- [x] إضافة أداة تقييم التقرير الموحد وإرسال تنبيه Critical إلى Slack أو البريد
+- [x] تمرير القنوات عبر GitHub Secrets مع منع أي قيمة افتراضية أو تسجيل للسر
+- [x] ربط الإخطار ببوابة الجودة ومنع النشر عند وجود Critical
+- [x] إضافة اختبارات no-critical وcritical وredaction وفشل القناة
+- [x] تحديث المهارة بدليل التشغيل والتدوير والـdeduplication
+
+
+## Webhook Retry and Idempotency
+- [x] إضافة backoff محدود لحالات 429 و5xx مع احترام Retry-After
+- [x] إضافة مفتاح idempotency ثابت لكل Workflow/finding/channel
+- [x] اختبار 429 و5xx وإعادة المحاولة وعدم تكرار الرسائل
+- [x] تحديث Workflow والمهارة والتوثيق ثم دفع التعديل
+
+
+## Local HTTPS Redis Idempotency Gateway
+- [x] إضافة بوابة محلية تستقبل التنبيه وتطبق Redis SET NX مع TTL
+- [x] إضافة تحقق من Idempotency-Key وحماية endpoint وforwarding اختياري
+- [x] إضافة اختبارات مفتاح ثابت ومختلف ومنع المكرر في test_notify_security.py
+- [x] إضافة Compose وHTTPS local certificate instructions وتحديث المهارة (فحص Compose يتطلب Docker Compose غير المتاح في الساندبوكس)
+
+
+## Security Gateway Production TLS Integration
+- [x] إضافة إعدادات Redis TLS وشهادات mTLS إلى Security Gateway عبر متغيرات بيئة أو ملفات أسرار
+- [x] ربط security-notify في GitHub Actions بـSecurity Gateway عبر HTTPS وIdempotency-Key
+- [x] توثيق أسرار الشهادات وإجراءات الدوران وعدم تخزينها في Git أو artifacts
+- [x] إضافة اختبارات الإعدادات والتوثيق والتحقق ثم دفع التعديل
+
+
+## Security Gateway Reusable Skill and Live Integration Test
+- [x] إضافة runner لاختبار البوابة وRedis داخل Docker Compose
+- [x] إثبات 202 للطلب الأول و200 duplicate للطلب الثاني عبر Redis الفعلي
+- [x] تحديث مهارة skill-creator بمسار الاختبار الحي وmTLS وRedis TLS
+- [x] تشغيل التحقق وتوثيق قيود Docker ثم دفع التعديل
+
+
+## Weekly Security Gateway Monitoring
+- [x] إضافة أداة تجميع أخطاء البوابة وتوليد تقرير أسبوعي منقح
+- [x] إضافة Workflow مجدول يرسل التقرير إلى Slack
+- [x] إضافة اختبارات للتجميع والتنقيح والحالات الخالية من الأخطاء
+- [x] تحديث المهارة والتوثيق ثم التحقق والدفع
+
+
+## Weekly Report Verification
+- [x] إضافة اختبار متوسط زمن الاستجابة مع قيم غير صالحة أو مفقودة
+- [x] إضافة اختبار حدود نافذة السبعة أيام والأحداث بلا timestamp
+- [x] توثيق cron الإثنين وتشغيل workflow يدوياً
+
+
+## Weekly Workflow Failure Alerts
+- [x] إضافة أداة تنبيه فشل Workflow إلى Slack بملخص آمن
+- [x] إضافة job يعمل دائماً بعد فشل التقرير الأسبوعي
+- [x] إضافة مفتاح idempotency لتنبيه الفشل واختبارات التكرار
+- [x] تحديث المهارة والتوثيق ثم التحقق والدفع
+
+
+## Prometheus Alertmanager and Redis Idempotency Slides
+- [x] جمع مراجع رسمية وتوثيق PromQL وقواعد Alertmanager وفحص Redis
+- [x] إنشاء عرض شرائح عربي منظم مع أمثلة تشغيلية
+- [x] مراجعة العرض وتقديمه للمستخدم
+
+
+## Security Gateway Load Testing
+- [x] إضافة اختبار k6 قابل للتشغيل مع ramp-up وتحقق من SLA وIdempotency
+- [x] إضافة مراقبة Redis وGateway أثناء اختبار الحمل وتوثيق حدود البيئة
+- [x] تحديث المهارة بالاختبار الآمن وتحليل النتائج وعدم تشغيل ضغط إنتاجي افتراضياً
+- [x] إضافة اختبارات/تحقق للملفات ثم دفع التعديل
+
+
+## k6 Results Visual Analysis
+- [x] إضافة محلل Python لنتائج load-results.json وتقرير HTML/Markdown
+- [x] توليد رسوم للكمون ومعدل الطلبات والأخطاء ونتائج thresholds
+- [x] إضافة اختبارات صيغ k6 الأساسية والحالات الناقصة
+- [x] تحديث المهارة والتحقق ثم دفع التعديل
+
+
+## k6 CI Visual Performance Report
+- [x] إضافة Workflow staging لتشغيل k6 وتصدير load-results.json
+- [x] تشغيل محلل Python وتوليد HTML/JSON وGITHUB_STEP_SUMMARY
+- [x] فرض thresholds ورفع التقارير كـartifacts دون أسرار
+- [x] تحديث المهارة والتوثيق والاختبارات ثم دفع التعديل
+
+
+## k6 Failure Alerts
+- [x] إضافة أداة Slack لملخص فشل اختبار الحمل دون كشف الأسرار
+- [x] ربط التنبيه بوظيفة always في Workflow مع الاحتفاظ بفشل الاختبار
+- [x] إضافة اختبارات payload وIdempotency ومسار القناة غير المفعلة
+- [x] تحديث المهارة والتوثيق ثم التحقق والدفع
+
+
+## Grafana Live Load Dashboard
+- [x] إضافة Dashboard JSON لمقاييس k6 والبوابة وRedis
+- [x] إضافة provisioning لمصدر Prometheus ولوحة Grafana
+- [x] إضافة اختبار صحة JSON وPromQL وتوثيق الاستيراد
+- [x] تحديث المهارة والتحقق ثم دفع التعديل
+
+
+## Per-Endpoint PromQL Latency
+- [x] إضافة متغير Endpoint واستعلامات p95 وp99 حسب route
+- [x] إضافة اختبارات صحة PromQL وتحقق أسماء histogram labels
+- [x] تحديث المهارة وتوثيق cardinality ثم التحقق والدفع
+
+
+## P99 Latency Alert
+- [x] إضافة قاعدة تنبيه p99 أعلى من 500ms لمدة 5 دقائق حسب route
+- [x] ربط alert بـAlertmanager receiver مع labels وannotations آمنة
+- [x] إضافة اختبار promtool لحالة firing وinactive
+- [x] تحديث المهارة والتحقق ثم دفع التعديل
+
+
+## Live P99 Alert Integration Test
+- [x] إضافة fixture latency يرفع p99 فوق 500ms
+- [x] إضافة runner يثبت pending ثم firing ثم resolved عبر Prometheus وAlertmanager
+- [x] التحقق من وصول payload إلى مستقبل Alertmanager المحلي
+- [x] تحديث المهارة والتوثيق ثم التحقق والدفع
+
+
+## Alertmanager Webhook Security Testing
+- [x] إضافة اختبارات منع تسريب Authorization وtokens وcookies وبيانات payload
+- [x] اختبار تنقيح السجلات ورفض الحقول الحساسة عبر مستقبل Webhook
+- [x] ربط فحص التسريب بالـCI دون طباعة الأسرار
+- [x] تحديث المهارة والتوثيق ثم التحقق والدفع
+
+
+## Authorized Security Gateway Penetration Testing
+- [x] إضافة خطة نطاق وتفويض واختبار غير تدميري للبوابة
+- [x] إضافة فحوص مصادقة mTLS وBearer وRedis وWebhook وAlertmanager
+- [x] إضافة اختبارات حدود CI ومنع تسريب التقارير والأسرار
+- [x] تحديث المهارة بتقرير PenTest وقواعد التوقف والتصعيد
+- [x] تشغيل التحقق والدفع
+
+
+## Weekly Authorized PenTest Digest
+- [x] إضافة مولد ملخص أسبوعي لنتائج PenTest المنقحة
+- [x] إضافة Workflow مجدول يوم الإثنين على staging مع Environment approval
+- [x] إرسال ملخص الثغرات إلى Slack مع Idempotency وعدم كشف الأسرار
+- [x] إضافة اختبارات وتحديث المهارة والتحقق ثم الدفع
+
+
+## Security Regression Detection
+- [x] إضافة أداة مقارنة التقرير الحالي بالسابق حسب بصمة finding
+- [x] تصنيف الثغرات الجديدة والعائدة والمغلقة وتغيرات الشدة
+- [x] دمج النتيجة في التقرير الأسبوعي وSlack وCI
+- [x] إضافة اختبارات وتحديث المهارة والتحقق ثم الدفع
+
+
+## Safe Endpoint Abuse-Resistance Testing
+- [x] إضافة اختبار محدود للتحقق من 429 وRetry-After وrate limiting
+- [x] إضافة اختبار timeout وpayload/connection bounds دون ضغط DDoS فعلي
+- [x] ربط الفحوص بـCI مع guard يمنع production targets
+- [x] تحديث المهارة والتوثيق والاختبارات ثم التحقق والدفع
+
+
+## Safe Medium Stress Testing
+- [x] إضافة سيناريو Stress متدرج للحمل المتوسط مع thresholds للكمون والأخطاء
+- [x] إضافة مراقبة الموارد وقواعد الإيقاف وعدم استهداف الإنتاج
+- [x] إضافة اختبارات الحواجز والمدخلات وتحديث المهارة
+- [x] التحقق والدفع ثم توثيق تفسير النتائج
+
+
+## Idempotent Payment Stress Testing
+- [x] إضافة سيناريو k6 للدفع مع Idempotency-Key وإعادة المحاولة المحدودة
+- [x] التحقق من 2xx/409/429/5xx وعدم تكرار الأثر المالي
+- [x] توثيق وتحسين Node.js Event Loop وقياس event-loop lag
+- [x] إضافة اختبارات الحواجز وتحديث المهارة والتحقق والدفع
+
+
+## CI Idempotency and Database Transient Errors
+- [x] إضافة Workflow لاختبارات الدفع وIdempotency في staging المحمي
+- [x] إضافة quality gates للتكرار والـretry والـ429/5xx مع artifacts منقحة
+- [x] توثيق استراتيجية Deadlock وserialization failures مع retry محدود وآمن
+- [x] إضافة اختبارات الحواجز والتحقق وتحديث المهارة ثم الدفع
+
+
+## Deadlock Alerts and Replay Protection
+- [x] إضافة قواعد Prometheus لتنبيهات Deadlock وفشل staging
+- [x] ربط Alertmanager بمسار Slack آمن مع deduplication وrecovery
+- [x] توثيق ضوابط Webhook وتوقيع الطلبات وRedis Idempotency ضد Replay
+- [x] إضافة اختبارات الحماية والتحقق وتحديث المهارة ثم الدفع
+
+
+## Redis Lock and Idempotency Integration CI
+- [x] إضافة اختبار تكامل متزامن لنفس Idempotency-Key مع Redis
+- [x] التحقق من رفض body مختلف وإعادة المحاولة بعد انتهاء القفل
+- [x] دمج الاختبار في GitHub Actions مع Redis service وartifacts منقحة
+- [x] تحديث المهارة والتوثيق والتحقق والدفع
+
+
+## CI Idempotency Load Test
+- [x] إضافة Job k6 مستقل يعتمد على نجاح Redis integration
+- [x] إضافة smoke وmedium profiles مع thresholds وartifacts
+- [x] إضافة حواجز staging ومنع production وإشعار فشل منقح
+- [x] تحديث المهارة والتوثيق والتحقق والدفع
+
+
+## Live Grafana p95 Alert During k6
+- [x] إضافة قاعدة p95 لكل testid عند تجاوز 750ms
+- [x] ربط Alertmanager بتنبيه Slack مع deduplication وresolved notifications
+- [x] إضافة تشغيل k6 عبر remote write وملخص فشل فوري في GitHub Actions
+- [x] إضافة اختبارات المراقبة وتحديث المهارة والتحقق والدفع
+
+
+## Local Prometheus Alertmanager Slack Lab
+- [x] إضافة Compose محلي بمقاييس اصطناعية ومستقبل Webhook منقح
+- [x] اختبار firing وresolved وتنبيه p95 وidempotency للـfingerprint
+- [x] توثيق أوامر التشغيل وعدم استخدام Slack الإنتاجي
+- [x] تحديث المهارة والتحقق والدفع
+
+
+## PR Alert Lab CI
+- [x] إضافة Workflow يعمل مع كل Pull Request لتشغيل مختبر التنبيهات المحلي
+- [x] اختبار firing وresolved والتحقق من payload المنقح
+- [x] رفع logs وartifacts عند الفشل فقط دون أسرار
+- [x] تحديث المهارة والتوثيق والتحقق والدفع
+
+
+## PR Webhook SAST and DAST
+- [x] إضافة SAST وفحص dependencies داخل Pull Request
+- [x] إضافة DAST محدود على مختبر Webhook محلي غير إنتاجي
+- [x] رفع SARIF وartifacts منقحة مع quality gates للثغرات العالية
+- [x] تحديث المهارة والتوثيق والتحقق والدفع
+
+
+## Local Docker SAST Preflight
+- [x] إضافة سكربت Docker لتشغيل Semgrep وTrivy بإصدارات مطابقة لـCI
+- [x] حفظ SARIF وتقارير JSON وملخص منقح مع quality gates
+- [x] إضافة اختبارات الحواجز والتحقق من عدم تسريب الأسرار
+- [x] تحديث المهارة والتوثيق والتحقق والدفع
+
+
+## SARIF Pull Request Comments
+- [x] إضافة رفع SARIF إلى Code Scanning مع category لكل أداة
+- [x] إضافة ملخص SAST منقح داخل تعليق Pull Request قابل للتحديث
+- [x] حماية تعليقات fork ومنع الأسرار وازدواجية التعليقات
+- [x] تحديث المهارة والتوثيق والتحقق والدفع
+
+
+## Protected Production Branch
+- [x] تحديد أسماء status checks الخاصة بـSAST وCode Scanning المطلوبة
+- [x] إعداد سياسة branch protection لـmain/master مع مراجعة وموافقة
+- [x] إضافة تحقق آلي من حماية الفرع وتوثيق خطوات GitHub
+- [x] تحديث المهارة والتحقق والدفع
+
+
+## CI Quality Gate Diagnosis
+- [x] جمع سجلات GitHub Actions وتحديد الأسباب الجذرية للفشل
+- [x] إصلاح تعارض Flutter SDK مع pubspec والـlockfile
+- [x] إصلاح migration وخطة pgTAP ومسار Flutter integration test
+- [x] تحديث المهارة والتوثيق والتحقق
+
+
+## Security Review PR Escalation
+- [x] إضافة قالب Pull Request يتضمن شرط مراجعة الأمن عند فشل Quality gate
+- [x] إضافة CODEOWNERS لمسارات الأمن وWorkflow وBackend
+- [x] إضافة Workflow لتصعيد PR الفاشل إلى فريق الأمن دون أسرار أو صلاحيات زائدة
+- [x] إضافة اختبارات القالب والتصعيد وتحديث المهارة والتحقق والدفع
+
+
+## Local workflow_run Simulation with act
+- [x] إضافة payloads اصطناعية لنجاح وفشل workflow_run وfork PR
+- [x] إضافة أمر act محلي يمنع أي API writes أو أسرار حقيقية
+- [x] اختبار قرار التصعيد وmarker وsafe no-write path
+- [x] تحديث المهارة والتوثيق والتحقق والدفع
+
+
+## act Slack Notification Integration
+- [x] إضافة اختبار تكامل يستقبل firing وresolved من Alertmanager محلي
+- [x] التحقق من deduplication وtestid وredaction داخل payloads
+- [x] ربط التشغيل مع fixtures وact دون Slack أو GitHub API حقيقي
+- [x] تحديث المهارة والتوثيق والتحقق والدفع
+
+
+## Daily Unified Test and Security Report
+- [x] إضافة مجمع يومي لنتائج الاختبارات التكاملية وSAST/DAST/Trivy وCoverage
+- [x] إضافة Workflow مجدول مع تقرير Markdown وJSON منقح
+- [x] إضافة إرسال Slack وEmail مع idempotency وحماية الأسرار
+- [x] إضافة اختبارات التقرير وتحديث المهارة والتحقق والدفع
+
+
+## Continuous Security Webhook Monitoring
+- [x] إضافة مسار Alertmanager فوري منفصل عن التقرير اليومي
+- [x] إضافة مستقبل Webhook مصادق مع HMAC وtimestamp وRedis Idempotency عند ضبط REDIS_URL
+- [ ] إضافة retry محدود وdead-letter وقياس صحة التسليم في بوابة الإنتاج (Alertmanager retry موثق؛ التنفيذ الإنتاجي اللاحق)
+- [x] إضافة اختبارات التكامل وتحديث المهارة والتحقق والدفع
