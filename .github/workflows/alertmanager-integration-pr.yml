@@ -1,0 +1,80 @@
+name: Alertmanager integration
+
+on:
+  pull_request:
+    paths:
+      - "backend/ops/alertmanager/**"
+      - "backend/ops/prometheus/**"
+      - "backend/ops/observability/**"
+      - "tooling/*alertmanager*"
+      - "tooling/*synthetic*"
+      - ".github/workflows/alertmanager-integration-pr.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: alertmanager-integration-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  alertmanager-integration:
+    name: Prometheus to Alertmanager integration
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install test dependencies
+        run: python -m pip install --disable-pip-version-check pyyaml pytest
+
+      - name: Validate static configuration
+        run: |
+          python -m json.tool backend/ops/grafana/redis-stream-circuit-breaker.json >/dev/null
+          pytest -q tooling/test_alertmanager_integration.py tooling/test_synthetic_notifications.py tooling/test_advanced_collector_alerts.py tooling/test_circuit_alert_routing.py
+
+      - name: Start isolated Alertmanager stack
+        run: |
+          docker compose -f backend/ops/observability/docker-compose.alertmanager-integration.yml up -d
+          for i in $(seq 1 30); do
+            curl --fail --silent http://127.0.0.1:18080/received >/dev/null && break
+            sleep 2
+          done
+          curl --fail --silent http://127.0.0.1:9090/-/ready
+          curl --fail --silent http://127.0.0.1:9093/-/ready
+
+      - name: Run firing and resolved integration test
+        run: |
+          mkdir -p artifacts
+          python tooling/integration_test_alertmanager.py \
+            --receiver http://127.0.0.1:18080 \
+            --prometheus http://127.0.0.1:9090 \
+            --wait-seconds 45 \
+            --output artifacts/alertmanager-integration.json
+
+      - name: Upload integration evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: alertmanager-integration-${{ github.run_id }}
+          path: artifacts/
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Collect service diagnostics
+        if: failure()
+        run: |
+          mkdir -p artifacts/diagnostics
+          docker compose -f backend/ops/observability/docker-compose.alertmanager-integration.yml ps > artifacts/diagnostics/compose-ps.txt
+          docker compose -f backend/ops/observability/docker-compose.alertmanager-integration.yml logs --no-color --timestamps > artifacts/diagnostics/compose.log
+
+      - name: Stop isolated stack
+        if: always()
+        run: docker compose -f backend/ops/observability/docker-compose.alertmanager-integration.yml down -v --remove-orphans

@@ -1,0 +1,116 @@
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+  pprof:
+    endpoint: 0.0.0.0:1777
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+        max_recv_msg_size_mib: 4
+      http:
+        endpoint: 0.0.0.0:4318
+        cors:
+          allowed_origins:
+            - https://smart-accountant.example.com
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 768
+    spike_limit_mib: 192
+
+  resource/normalize:
+    attributes:
+      - key: service.version
+        action: upsert
+        from_attribute: deployment.version
+      - key: deployment.environment
+        action: upsert
+        value: production
+
+  filter/drop-sensitive:
+    error_mode: ignore
+    traces:
+      span:
+        - 'attributes["http.request.header.authorization"] != nil'
+        - 'attributes["http.request.header.cookie"] != nil'
+        - 'attributes["db.connection_string"] != nil'
+
+  transform/redact:
+    error_mode: ignore
+    trace_statements:
+      - context: span
+        statements:
+          - 'delete_key(attributes, "http.request.header.authorization")'
+          - 'delete_key(attributes, "http.request.header.cookie")'
+          - 'delete_key(attributes, "db.connection_string")'
+          - 'replace_pattern(attributes["url.full"], "([?&](token|api_key|password|secret)=[^&]*)", "$1=REDACTED")'
+          - 'replace_pattern(attributes["db.statement"], "(?i)(password|token|secret)\\s*=\\s*[^ ]+", "$1=REDACTED")'
+
+  tail_sampling:
+    decision_wait: 10s
+    num_traces: 50000
+    expected_new_traces_per_sec: 2000
+    policies:
+      - name: errors
+        type: status_code
+        status_code:
+          status_codes: [ERROR]
+      - name: slow-or-critical-latency
+        type: latency
+        latency:
+          threshold_ms: 750
+      - name: chaos-experiment
+        type: ottl_condition
+        ottl_condition:
+          error_mode: ignore
+          span:
+            - 'attributes["chaos.experiment_id"] != nil'
+      - name: circuit-open
+        type: ottl_condition
+        ottl_condition:
+          error_mode: ignore
+          span:
+            - 'attributes["circuit.state"] == "open"'
+      - name: baseline
+        type: probabilistic
+        probabilistic:
+          sampling_percentage: 5
+
+  batch:
+    timeout: 5s
+    send_batch_size: 512
+    send_batch_max_size: 1024
+
+exporters:
+  otlphttp/jaeger:
+    endpoint: ${env:JAEGER_OTLP_ENDPOINT}
+    compression: gzip
+    timeout: 10s
+    retry_on_failure:
+      enabled: true
+      initial_interval: 1s
+      max_interval: 10s
+      max_elapsed_time: 30s
+  debug:
+    verbosity: basic
+
+service:
+  extensions: [health_check, pprof]
+  telemetry:
+    logs:
+      level: warn
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors:
+        - memory_limiter
+        - resource/normalize
+        - filter/drop-sensitive
+        - transform/redact
+        - tail_sampling
+        - batch
+      exporters: [otlphttp/jaeger]

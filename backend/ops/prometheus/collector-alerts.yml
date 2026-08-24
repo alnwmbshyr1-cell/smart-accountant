@@ -1,0 +1,87 @@
+groups:
+  - name: opentelemetry-collector-resilience
+    interval: 30s
+    rules:
+      - alert: OTelCollectorMemoryPressure
+        expr: otelcol_process_memory_rss_bytes > 644245094
+        for: 10m
+        labels:
+          severity: warning
+          category: observability
+          component: otel-collector
+        annotations:
+          summary: "OpenTelemetry Collector memory is above the safety budget"
+          description: "Collector {{ $labels.service_instance_id }} RSS is above 85% of the configured 768 MiB budget."
+          runbook: "https://runbooks.example.com/otel-collector/memory-pressure"
+
+      - alert: OTelCollectorMemoryCritical
+        expr: otelcol_process_memory_rss_bytes > 725937562
+        for: 5m
+        labels:
+          severity: critical
+          category: observability
+          component: otel-collector
+        annotations:
+          summary: "OpenTelemetry Collector memory is critically high"
+          description: "Collector {{ $labels.service_instance_id }} RSS is above 95% of the configured memory budget."
+          runbook: "https://runbooks.example.com/otel-collector/memory-pressure"
+
+      - alert: OTelCollectorExporterQueueSaturation
+        expr: max by (service_instance_id, exporter) (100 * otelcol_exporter_queue_size / clamp_min(otelcol_exporter_queue_capacity, 1)) > 90
+        for: 10m
+        labels:
+          severity: critical
+          category: observability
+          component: otel-collector
+        annotations:
+          summary: "OpenTelemetry Collector exporter queue is saturated"
+          description: "Exporter {{ $labels.exporter }} on {{ $labels.service_instance_id }} is above 90% queue utilization."
+          runbook: "https://runbooks.example.com/otel-collector/exporter-queue"
+
+      - alert: OTelCollectorRefusedSpans
+        expr: sum by (receiver, transport) (rate(otelcol_receiver_refused_spans_total[5m])) > 0
+        for: 5m
+        labels:
+          severity: high
+          category: observability
+          component: otel-collector
+        annotations:
+          summary: "OpenTelemetry Collector is refusing spans"
+          description: "Receiver {{ $labels.receiver }}/{{ $labels.transport }} is refusing telemetry."
+          runbook: "https://runbooks.example.com/otel-collector/refused-spans"
+
+      - alert: OTelCollectorExporterFailures
+        expr: sum by (exporter) (rate(otelcol_exporter_send_failed_spans_total[5m])) > 0.1
+        for: 5m
+        labels:
+          severity: high
+          category: observability
+          component: otel-collector
+        annotations:
+          summary: "OpenTelemetry Collector exporter failures are elevated"
+          description: "Exporter {{ $labels.exporter }} is failing to send more than 0.1 spans per second."
+          runbook: "https://runbooks.example.com/otel-collector/exporter-failures"
+
+      - alert: OTelCollectorScrapeMissing
+        expr: absent(up{job="otel-collector"})
+        for: 5m
+        labels:
+          severity: critical
+          category: observability
+          component: otel-collector
+        annotations:
+          summary: "OpenTelemetry Collector scrape is missing"
+          description: "Prometheus cannot find the otel-collector target."
+          runbook: "https://runbooks.example.com/otel-collector/scrape-missing"
+
+      - alert: OTelCollectorTailSamplingDropSpike
+        expr: sum(rate(otelcol_processor_tail_sampling_global_count_traces_dropped[5m])) > 10
+        for: 10m
+        labels:
+          severity: warning
+          category: observability
+          component: otel-collector
+        annotations:
+          summary: "Tail-based sampling is dropping many traces"
+          description: "Tail sampling is dropping more than 10 traces per second; verify policy and capacity."
+          runbook: "https://runbooks.example.com/otel-collector/tail-sampling"

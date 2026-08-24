@@ -1,0 +1,115 @@
+name: Staging KEDA autoscaling gate
+
+on:
+  workflow_dispatch:
+    inputs:
+      rps:
+        description: "Offered requests per second"
+        required: false
+        default: "100"
+        type: string
+      duration:
+        description: "Load duration"
+        required: false
+        default: "2m"
+        type: string
+  workflow_run:
+    workflows: ["Deploy Staging"]
+    types: [completed]
+
+concurrency:
+  group: staging-keda-load
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  staging-keda-load:
+    name: Verify KEDA scale-up and recovery
+    if: >-
+      ${{
+        github.event_name == 'workflow_dispatch' ||
+        (github.event.workflow_run.conclusion == 'success' &&
+         github.event.workflow_run.head_branch == 'main')
+      }}
+    runs-on: ubuntu-latest
+    environment: staging
+    timeout-minutes: 25
+    steps:
+      - name: Checkout tested revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Configure staging kubeconfig
+        shell: bash
+        env:
+          KUBE_CONFIG_B64: ${{ secrets.STAGING_KUBECONFIG_B64 }}
+        run: |
+          set -euo pipefail
+          test -n "$KUBE_CONFIG_B64"
+          install -d -m 700 "$HOME/.kube"
+          printf '%s' "$KUBE_CONFIG_B64" | base64 --decode > "$HOME/.kube/config"
+          chmod 600 "$HOME/.kube/config"
+          kubectl version --client
+
+      - name: Install k6 and Redis CLI
+        uses: grafana/setup-k6-action@v1
+      - name: Install redis-cli
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends redis-tools
+
+      - name: Verify worker rollout and KEDA objects
+        env:
+          K8S_NAMESPACE: smart-accountant-staging
+        run: |
+          set -euo pipefail
+          kubectl -n "$K8S_NAMESPACE" rollout status deployment/security-webhook-worker --timeout=180s
+          kubectl -n "$K8S_NAMESPACE" get scaledobject security-webhook-worker
+          kubectl -n "$K8S_NAMESPACE" get hpa keda-hpa-security-webhook-worker
+
+      - name: Run guarded staging KEDA load test
+        env:
+          TARGET_URL: ${{ secrets.STAGING_TARGET_URL }}
+          REDIS_URL: ${{ secrets.STAGING_REDIS_URL }}
+          TEST_WEBHOOK_SECRET: ${{ secrets.STAGING_TEST_WEBHOOK_SECRET }}
+          RPS: ${{ inputs.rps || '100' }}
+          DURATION: ${{ inputs.duration || '2m' }}
+          K8S_NAMESPACE: smart-accountant-staging
+        run: |
+          set -euo pipefail
+          test -n "$TARGET_URL"
+          test -n "$REDIS_URL"
+          test -n "$TEST_WEBHOOK_SECRET"
+          python3 tooling/staging_keda_load_test.py \
+            --target-url "$TARGET_URL" \
+            --namespace "$K8S_NAMESPACE" \
+            --redis-url "$REDIS_URL" \
+            --rps "$RPS" \
+            --duration "$DURATION" \
+            --output artifacts/keda-load-observations.jsonl
+
+      - name: Publish KEDA load artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: keda-load-${{ github.run_id }}
+          path: |
+            artifacts/keda-load-observations.jsonl
+            artifacts/k6-summary.json
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Collect staging diagnostics on failure
+        if: failure()
+        shell: bash
+        env:
+          K8S_NAMESPACE: smart-accountant-staging
+        run: |
+          set +e
+          kubectl -n "$K8S_NAMESPACE" describe scaledobject security-webhook-worker > artifacts/scaledobject.txt
+          kubectl -n "$K8S_NAMESPACE" describe hpa keda-hpa-security-webhook-worker > artifacts/hpa.txt
+          kubectl -n "$K8S_NAMESPACE" get events --sort-by=.lastTimestamp > artifacts/events.txt
+          kubectl -n "$K8S_NAMESPACE" logs deployment/security-webhook-worker --all-containers --tail=300 > artifacts/worker.log

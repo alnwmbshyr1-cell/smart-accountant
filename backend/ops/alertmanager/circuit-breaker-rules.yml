@@ -1,0 +1,26 @@
+groups:
+  - name: smart-accountant-circuit-breaker
+    rules:
+      - alert: CircuitBreakerOpen
+        expr: circuit_breaker_state{dependency=~"slack-security|email-security|gemini"} == 1
+        for: 2m
+        labels:
+          severity: critical
+          category: security
+          notification_class: circuit_open
+        annotations:
+          summary: "Circuit Breaker is open for {{ $labels.dependency }}"
+          description: "Outbound calls to {{ $labels.dependency }} are failing fast; investigate the dependency and Redis state."
+          runbook: "https://github.com/alnwmbshyr1-cell/smart-accountant/blob/main/docs/hmac-replay-hardening.md"
+
+      - alert: CircuitBreakerRejectedSpike
+        expr: sum by (dependency) (rate(circuit_breaker_rejected_total[5m])) > 0.1
+        for: 5m
+        labels:
+          severity: high
+          category: security
+          notification_class: circuit_rejected
+        annotations:
+          summary: "Circuit Breaker rejecting calls for {{ $labels.dependency }}"
+          description: "The protected dependency is rejecting more than 0.1 calls per second over five minutes."
+          runbook: "https://github.com/alnwmbshyr1-cell/smart-accountant/blob/main/docs/hmac-replay-hardening.md"

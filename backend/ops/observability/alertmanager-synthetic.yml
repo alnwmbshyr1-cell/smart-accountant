@@ -1,0 +1,24 @@
+global:
+  resolve_timeout: 10s
+route:
+  receiver: synthetic-webhook
+  group_by: [alertname, component, severity]
+  group_wait: 0s
+  group_interval: 2s
+  repeat_interval: 1h
+  routes:
+    - matchers: [severity="critical"]
+      receiver: synthetic-pagerduty
+      continue: true
+    - matchers: [category="observability"]
+      receiver: synthetic-webhook
+      continue: false
+receivers:
+  - name: synthetic-webhook
+    webhook_configs:
+      - url: http://synthetic-receiver:18080/webhook
+        send_resolved: true
+  - name: synthetic-pagerduty
+    webhook_configs:
+      - url: http://synthetic-receiver:18080/pagerduty/v2/enqueue
+        send_resolved: true

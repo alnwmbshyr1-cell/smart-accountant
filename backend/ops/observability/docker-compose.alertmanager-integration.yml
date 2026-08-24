@@ -1,0 +1,36 @@
+services:
+  synthetic-receiver:
+    image: python:3.12-slim
+    working_dir: /workspace
+    command: ["python", "tooling/synthetic_alert_receiver.py", "--host", "0.0.0.0", "--port", "18080", "--secret", "local-only"]
+    environment:
+      ALLOW_UNSIGNED_SYNTHETIC: "true"
+    volumes:
+      - ../../..:/workspace:ro
+      - synthetic-artifacts:/workspace/artifacts
+    networks: [alerting]
+
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --web.enable-lifecycle
+    volumes:
+      - ./prometheus-synthetic.yml:/etc/prometheus/prometheus.yml:ro
+      - ../prometheus/collector-alerts.yml:/etc/prometheus/rules/collector-alerts.yml:ro
+    networks: [alerting]
+    depends_on: [alertmanager]
+
+  alertmanager:
+    image: prom/alertmanager:v0.28.1
+    command: ["--config.file=/etc/alertmanager/alertmanager.yml"]
+    volumes:
+      - ./alertmanager-synthetic.yml:/etc/alertmanager/alertmanager.yml:ro
+    networks: [alerting]
+
+networks:
+  alerting:
+    driver: bridge
+
+volumes:
+  synthetic-artifacts:

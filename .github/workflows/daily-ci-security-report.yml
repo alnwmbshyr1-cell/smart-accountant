@@ -1,0 +1,101 @@
+name: Daily CI and security report
+
+on:
+  schedule:
+    - cron: "15 06 * * *"
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+  security-events: read
+
+jobs:
+  daily-report:
+    name: Build and deliver daily report
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Collect recent workflow runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          since="$(date -u -d '24 hours ago' '+%Y-%m-%dT%H:%M:%SZ')"
+          gh api --paginate \
+            -H 'Accept: application/vnd.github+json' \
+            "/repos/${GITHUB_REPOSITORY}/actions/runs?per_page=100&created=>=${since}" \
+            > /tmp/runs.json
+
+      - name: Collect open Code Scanning alerts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api --paginate \
+            -H 'Accept: application/vnd.github+json' \
+            "/repos/${GITHUB_REPOSITORY}/code-scanning/alerts?state=open&per_page=100" \
+            > /tmp/code-scanning.json || printf '{"alerts":[]}' > /tmp/code-scanning.json
+
+      - name: Build redacted report
+        id: report
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tooling/daily_security_report.py \
+            --runs /tmp/runs.json \
+            --alerts /tmp/code-scanning.json \
+            --out-dir daily-report \
+            --report-only | tee /tmp/report-summary.json
+          echo "status=$(python3 -c 'import json; print(json.load(open("/tmp/report-summary.json"))["status"])')" >> "$GITHUB_OUTPUT"
+          echo "idempotency_key=$(python3 -c 'import json; print(json.load(open("/tmp/report-summary.json"))["idempotency_key"])')" >> "$GITHUB_OUTPUT"
+
+      - name: Upload report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: daily-ci-security-report-${{ github.run_id }}
+          path: daily-report/
+          retention-days: 14
+
+      - name: Send Slack report when configured
+        if: ${{ secrets.SECURITY_REPORT_SLACK_WEBHOOK != '' }}
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SECURITY_REPORT_SLACK_WEBHOOK }}
+          REPORT_FILE: daily-report/daily-security-report.md
+          IDEMPOTENCY_KEY: ${{ steps.report.outputs.idempotency_key }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          text="$(cat "$REPORT_FILE" | head -c 12000)"
+          payload="$(TEXT="$text" python3 -c 'import json,os; print(json.dumps({"text": os.environ["TEXT"]}, ensure_ascii=False))')"
+          curl --fail-with-body --silent --show-error \
+            --connect-timeout 5 --max-time 15 \
+            -H 'Content-Type: application/json' \
+            -H "X-Idempotency-Key: $IDEMPOTENCY_KEY" \
+            --data "$payload" "$SLACK_WEBHOOK"
+
+      - name: Send email report when configured
+        if: ${{ secrets.SECURITY_REPORT_SMTP_HOST != '' && secrets.SECURITY_REPORT_EMAIL_TO != '' }}
+        uses: dawidd6/action-send-mail@v6
+        with:
+          server_address: ${{ secrets.SECURITY_REPORT_SMTP_HOST }}
+          server_port: ${{ secrets.SECURITY_REPORT_SMTP_PORT || 587 }}
+          username: ${{ secrets.SECURITY_REPORT_SMTP_USERNAME }}
+          password: ${{ secrets.SECURITY_REPORT_SMTP_PASSWORD }}
+          subject: "Daily CI and security report — ${{ github.repository }}"
+          to: ${{ secrets.SECURITY_REPORT_EMAIL_TO }}
+          from: ${{ secrets.SECURITY_REPORT_EMAIL_FROM || 'security-report@github.actions' }}
+          body: file://daily-report/daily-security-report.md
+          attachments: daily-report/daily-security-report.json
+
+      - name: Fail after delivery when report is red
+        if: ${{ steps.report.outputs.status == 'FAIL' }}
+        run: |
+          echo 'Daily report contains failed workflows or open High/Critical findings.'
+          exit 1
