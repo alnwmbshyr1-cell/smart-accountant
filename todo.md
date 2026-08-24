@@ -762,3 +762,10 @@
 - [x] إضافة مستقبل Webhook مصادق مع HMAC وtimestamp وRedis Idempotency عند ضبط REDIS_URL
 - [ ] إضافة retry محدود وdead-letter وقياس صحة التسليم في بوابة الإنتاج (Alertmanager retry موثق؛ التنفيذ الإنتاجي اللاحق)
 - [x] إضافة اختبارات التكامل وتحديث المهارة والتحقق والدفع
+
+
+## PR #1 status and production DLQ follow-up
+- [ ] متابعة نتائج فحوصات Pull Request رقم 1 وتوثيق حالات النجاح والفشل
+- [ ] تنفيذ طابور Dead-Letter Queue لرسائل Webhook بعد استنفاد retry
+- [ ] إضافة مقاييس التسليم التفصيلية وendpoint صحة/metrics واختبارات DLQ
+- [ ] تحديث توثيق التشغيل والمهارة بعد التحقق النهائي
