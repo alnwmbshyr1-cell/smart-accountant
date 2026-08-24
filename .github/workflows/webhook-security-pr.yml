@@ -2,11 +2,6 @@ name: Webhook Security PR
 
 on:
   pull_request:
-    paths:
-      - 'backend/**'
-      - 'tooling/**'
-      - 'backend/ops/alert-lab/**'
-      - '.github/workflows/webhook-security-pr.yml'
   workflow_dispatch:
 
 permissions:
