@@ -769,3 +769,10 @@
 - [ ] تنفيذ طابور Dead-Letter Queue لرسائل Webhook بعد استنفاد retry
 - [ ] إضافة مقاييس التسليم التفصيلية وendpoint صحة/metrics واختبارات DLQ
 - [x] تحديث توثيق التشغيل والمهارة بعد التحقق النهائي
+
+
+## Redis Stream Worker and HMAC replay hardening
+- [ ] كتابة نموذج FastAPI لاستقبال Webhook والتحقق من HMAC وtimestamp
+- [ ] كتابة Redis Stream Worker مع Consumer Group وretry وDLQ
+- [ ] إضافة اختبارات للعقد الأمني والتكرار وإعادة المحاولة
+- [ ] توثيق إدارة مفاتيح HMAC والحدود الإنتاجية للنموذج
