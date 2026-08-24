@@ -16,7 +16,7 @@ permissions:
   security-events: write
 
 env:
-  FLUTTER_VERSION: '3.27.1'
+  FLUTTER_VERSION: '3.38.1'
   PUB_CACHE: ${{ github.workspace }}/.pub-cache
   GRADLE_OPTS: -Dorg.gradle.daemon=false -Dorg.gradle.parallel=false -Dorg.gradle.caching=true
 
