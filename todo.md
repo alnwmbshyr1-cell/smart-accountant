@@ -874,3 +874,10 @@
 - [x] إضافة Alertmanager routing مخصص حسب severity مع deduplication وinhibition
 - [x] إضافة اختبارات YAML وPromQL وpromtool وغياب الأسرار
 - [x] تحديث المهارة والتوثيق والتحقق ومزامنة Pull Request
+
+
+## Local synthetic notification testing
+- [x] تعريف Mock Webhook وPagerDuty وعزل الأسرار والوجهات الإنتاجية
+- [x] إضافة Synthetic runner لاختبارات firing وresolved وdeduplication
+- [x] إضافة اختبارات payload وHMAC وredaction وtimeouts
+- [x] تحديث المهارة والتوثيق والتحقق ومزامنة Pull Request
