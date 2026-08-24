@@ -797,3 +797,10 @@
 - [x] إضافة Metrics collector وFastAPI /metrics instrumentation
 - [x] إضافة اختبارات المقاييس وعدم تسريب labels عالية cardinality
 - [x] تحديث المهارة والتوثيق والتحقق ومزامنة Pull Request
+
+
+## Circuit Open alert routing
+- [x] إضافة قاعدة Prometheus لتنبيه Circuit Open المستمر
+- [x] إضافة مسارات Alertmanager لـPagerDuty وWebhook مع resolved
+- [x] إضافة اختبارات routing وpayload دون اتصال خارجي
+- [x] تحديث المهارة والتوثيق والتحقق ومزامنة Pull Request

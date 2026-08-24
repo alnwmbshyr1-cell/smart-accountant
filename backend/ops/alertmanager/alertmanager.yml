@@ -11,6 +11,20 @@ route:
   repeat_interval: 4h
   routes:
     - matchers:
+        - alertname="CircuitBreakerOpen"
+      receiver: smart-accountant-circuit-pagerduty
+      group_wait: 0s
+      group_interval: 1m
+      repeat_interval: 30m
+      continue: true
+    - matchers:
+        - alertname="CircuitBreakerOpen"
+      receiver: smart-accountant-circuit-webhook
+      group_wait: 0s
+      group_interval: 1m
+      repeat_interval: 30m
+      continue: true
+    - matchers:
         - category="security"
       receiver: smart-accountant-security-webhook
       group_wait: 0s
@@ -76,6 +90,25 @@ receivers:
       - url_file: /etc/alertmanager/secrets/security_webhook_url
         send_resolved: true
         max_alerts: 20
+
+  - name: smart-accountant-circuit-pagerduty
+    pagerduty_configs:
+      - routing_key_file: /etc/alertmanager/secrets/pagerduty_routing_key
+        send_resolved: true
+        severity: '{{ if eq .CommonLabels.severity "critical" }}critical{{ else }}warning{{ end }}'
+        class: '{{ .CommonLabels.alertname }}'
+        component: '{{ .CommonLabels.dependency }}'
+        group: smart-accountant-circuit-breaker
+        details:
+          summary: '{{ .CommonAnnotations.summary }}'
+          description: '{{ .CommonAnnotations.description }}'
+          runbook: '{{ .CommonAnnotations.runbook }}'
+
+  - name: smart-accountant-circuit-webhook
+    webhook_configs:
+      - url_file: /etc/alertmanager/secrets/circuit_open_webhook_url
+        send_resolved: true
+        max_alerts: 10
 
 inhibit_rules:
   - source_matchers:
