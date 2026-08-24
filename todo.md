@@ -825,3 +825,10 @@
 - [x] إضافة Deployment وScaledObject KEDA مع Redis TLS وSecret reference
 - [x] إضافة اختبارات manifests وتحديث Dashboard Grafana بمؤشرات HPA/KEDA
 - [x] تحديث المهارة والتوثيق والتحقق ومزامنة Pull Request
+
+
+## KEDA staging load verification
+- [x] تحديد مراحل الحمل ومعايير نجاح scale-up وscale-down في Staging
+- [x] إضافة مشغّل اختبار يقيس Redis Stream backlog وKEDA/HPA replicas
+- [x] إضافة اختبارات آلية للـrunbook وحماية أهداف الاختبار
+- [x] تحديث المهارة والتوثيق وGrafana والتحقق ومزامنة Pull Request
