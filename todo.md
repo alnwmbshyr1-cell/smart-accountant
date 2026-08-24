@@ -853,3 +853,10 @@
 - [x] إضافة OpenTelemetry instrumentation وJaeger exporter/configuration
 - [x] ربط trace IDs بتجربة Redis outage وإضافة اختبارات collector والتسريب
 - [x] تحديث المهارة والتوثيق وGrafana والتحقق ومزامنة Pull Request
+
+
+## Production OpenTelemetry Collector sampling
+- [x] تحديد pipeline وذاكرة Collector وسياسة Tail-based Sampling
+- [x] إضافة فلترة وإزالة الحقول الحساسة مع إعداد Collector إنتاجي
+- [x] إضافة اختبارات YAML وPII redaction وsampling/resource limits
+- [x] تحديث المهارة والتوثيق والتحقق ومزامنة Pull Request
