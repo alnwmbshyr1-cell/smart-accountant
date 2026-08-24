@@ -20,3 +20,7 @@ def test_staging_runner_observes_kubernetes_hpa_and_stream_backlog():
     assert 'desiredReplicas' in source
     assert 'keda-hpa-security-webhook-worker' in source
     assert 'keda-load-observations.jsonl' in source
+    assert '--scale-up-timeout' in source
+    assert '--scale-down-timeout' in source
+    assert 'KEDA did not scale up' in source
+    assert 'Redis backlog did not drain' in source

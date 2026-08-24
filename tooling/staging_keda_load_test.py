@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run a guarded staging load test and record KEDA/HPA/Redis observations."""
+"""Run a guarded staging load test and assert KEDA scale-up and recovery."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ import subprocess
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-
+from typing import Callable
 
 
 def run(command: list[str], *, timeout: int = 10) -> str:
@@ -19,8 +19,7 @@ def run(command: list[str], *, timeout: int = 10) -> str:
 
 
 def kubectl_replicas(namespace: str, deployment: str) -> dict[str, int]:
-    raw = run(["kubectl", "-n", namespace, "get", "deployment", deployment, "-o", "json"])
-    data = json.loads(raw)
+    data = json.loads(run(["kubectl", "-n", namespace, "get", "deployment", deployment, "-o", "json"]))
     status = data.get("status", {})
     return {
         "desired": int(status.get("replicas", 0)),
@@ -30,8 +29,7 @@ def kubectl_replicas(namespace: str, deployment: str) -> dict[str, int]:
 
 
 def hpa_replicas(namespace: str, name: str) -> dict[str, int]:
-    raw = run(["kubectl", "-n", namespace, "get", "hpa", name, "-o", "json"])
-    data = json.loads(raw)
+    data = json.loads(run(["kubectl", "-n", namespace, "get", "hpa", name, "-o", "json"]))
     status = data.get("status", {})
     return {
         "current": int(status.get("currentReplicas", 0)),
@@ -42,13 +40,8 @@ def hpa_replicas(namespace: str, name: str) -> dict[str, int]:
 
 
 def stream_pending(redis_url: str, stream: str, group: str) -> int:
-    raw = run([
-        "redis-cli", "--tls", "-u", redis_url,
-        "XINFO", "GROUPS", stream,
-        "--json",
-    ])
-    groups = json.loads(raw)
-    for item in groups:
+    raw = run(["redis-cli", "--tls", "-u", redis_url, "XINFO", "GROUPS", stream, "--json"])
+    for item in json.loads(raw):
         values = dict(zip(item[::2], item[1::2]))
         if values.get("name") == group:
             return int(values.get("pending", 0))
@@ -64,6 +57,33 @@ def sample(namespace: str, deployment: str, hpa: str, redis_url: str, stream: st
     }
 
 
+def write_sample(handle, value: dict) -> None:
+    handle.write(json.dumps(value, sort_keys=True) + "\n")
+    handle.flush()
+
+
+def wait_for(
+    predicate: Callable[[dict], bool],
+    observe: Callable[[], dict],
+    handle,
+    timeout_seconds: int,
+    poll_seconds: int,
+    failure_message: str,
+) -> dict:
+    deadline = time.monotonic() + timeout_seconds
+    last = {}
+    while time.monotonic() < deadline:
+        try:
+            last = observe()
+            write_sample(handle, last)
+            if predicate(last):
+                return last
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, json.JSONDecodeError) as exc:
+            write_sample(handle, {"time": datetime.now(timezone.utc).isoformat(), "observation_error": type(exc).__name__})
+        time.sleep(poll_seconds)
+    raise RuntimeError(failure_message + f" Last observation: {last}")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--target-url", default=os.getenv("TARGET_URL", ""))
@@ -76,6 +96,9 @@ def main() -> int:
     parser.add_argument("--rps", type=int, default=int(os.getenv("RPS", "100")))
     parser.add_argument("--duration", default=os.getenv("DURATION", "2m"))
     parser.add_argument("--poll-seconds", type=int, default=15)
+    parser.add_argument("--scale-up-timeout", type=int, default=240)
+    parser.add_argument("--scale-down-timeout", type=int, default=420)
+    parser.add_argument("--minimum-scale-up", type=int, default=3)
     parser.add_argument("--output", type=Path, default=Path("artifacts/keda-load-observations.jsonl"))
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
@@ -86,11 +109,10 @@ def main() -> int:
         raise SystemExit("Refusing to run: --redis-url must use rediss://")
     if not 1 <= args.rps <= 2000:
         raise SystemExit("Refusing to run: RPS must be between 1 and 2000")
+    if args.scale_up_timeout <= 0 or args.scale_down_timeout <= 0 or args.poll_seconds <= 0:
+        raise SystemExit("Refusing to run: timeout and polling values must be positive")
 
-    command = [
-        "k6", "run", "--summary-export=artifacts/k6-summary.json",
-        "tooling/k6/redis_stream_circuit_breaker.js",
-    ]
+    command = ["k6", "run", "--summary-export=artifacts/k6-summary.json", "tooling/k6/redis_stream_circuit_breaker.js"]
     env = os.environ.copy()
     env.update({
         "TARGET_URL": args.target_url,
@@ -104,26 +126,39 @@ def main() -> int:
         print(json.dumps({"command": command, "namespace": args.namespace, "rps": args.rps, "duration": args.duration}))
         return 0
 
-    with args.output.open("a", encoding="utf-8") as observations:
+    observe = lambda: sample(args.namespace, args.deployment, args.hpa, args.redis_url, args.stream, args.consumer_group)
+    with args.output.open("w", encoding="utf-8") as observations:
+        baseline = observe()
+        write_sample(observations, {"phase": "baseline", **baseline})
+        baseline_replicas = max(baseline["deployment"]["desired"], baseline["hpa"]["current"], baseline["hpa"]["desired"])
         process = subprocess.Popen(command, env=env)
         try:
-            while process.poll() is None:
-                try:
-                    observations.write(json.dumps(sample(
-                        args.namespace, args.deployment, args.hpa,
-                        args.redis_url, args.stream, args.consumer_group,
-                    )) + "\n")
-                    observations.flush()
-                except (subprocess.CalledProcessError, subprocess.TimeoutExpired, json.JSONDecodeError) as exc:
-                    observations.write(json.dumps({
-                        "time": datetime.now(timezone.utc).isoformat(),
-                        "observation_error": type(exc).__name__,
-                    }) + "\n")
-                    observations.flush()
-                time.sleep(args.poll_seconds)
-        finally:
+            scaled = wait_for(
+                lambda item: max(item["deployment"]["desired"], item["hpa"]["current"], item["hpa"]["desired"]) >= max(args.minimum_scale_up, baseline_replicas + 1),
+                observe,
+                observations,
+                args.scale_up_timeout,
+                args.poll_seconds,
+                "KEDA did not scale up to the expected replica count while load was running.",
+            )
+            write_sample(observations, {"phase": "scale_up_confirmed", **scaled})
             return_code = process.wait()
-    return return_code
+            if return_code != 0:
+                raise RuntimeError(f"k6 failed with exit code {return_code}")
+            recovered = wait_for(
+                lambda item: item["pending"] == 0 and item["hpa"]["current"] <= item["hpa"]["min"] and item["deployment"]["ready"] >= item["hpa"]["min"],
+                observe,
+                observations,
+                args.scale_down_timeout,
+                args.poll_seconds,
+                "Redis backlog did not drain and KEDA did not return to min replicas.",
+            )
+            write_sample(observations, {"phase": "recovery_confirmed", **recovered})
+            return 0
+        finally:
+            if process.poll() is None:
+                process.terminate()
+                process.wait(timeout=20)
 
 
 if __name__ == "__main__":

@@ -832,3 +832,10 @@
 - [x] إضافة مشغّل اختبار يقيس Redis Stream backlog وKEDA/HPA replicas
 - [x] إضافة اختبارات آلية للـrunbook وحماية أهداف الاختبار
 - [x] تحديث المهارة والتوثيق وGrafana والتحقق ومزامنة Pull Request
+
+
+## CI/CD KEDA staging load gate
+- [x] تعريف GitHub Environment وSecrets المطلوبة لاختبار Staging
+- [x] إضافة Workflow ينتظر النشر ويشغل KEDA Load Test
+- [x] إضافة تحقق scale-up وscale-down ورفع artifacts عند الفشل
+- [x] تحديث المهارة والتوثيق واختبارات Workflow والتحقق ومزامنة Pull Request
