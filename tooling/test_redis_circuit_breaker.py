@@ -1,8 +1,13 @@
 import asyncio
+import sys
+from pathlib import Path
 from unittest.mock import AsyncMock
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend" / "ops"))
 
 import pytest
 import pytest_asyncio
+from prometheus_client import generate_latest
 
 fakeredis = pytest.importorskip("fakeredis.aioredis")
 from redis_circuit_breaker import CircuitConfig, CircuitOpenError, RedisCircuitBreaker
@@ -37,6 +42,19 @@ async def test_half_open_allows_one_probe(redis):
     redis.eval = AsyncMock(return_value=1)
     await breaker.record_success(token)
     assert await redis.get(breaker.open_key) is None
+
+
+def test_metrics_use_bounded_dependency_label():
+    from redis_circuit_breaker import CircuitBreakerMetrics
+
+    first = CircuitBreakerMetrics("slack-security")
+    second = CircuitBreakerMetrics("slack-security")
+    first.set_state("open")
+    second.rejected.labels("slack-security").inc()
+    output = generate_latest().decode()
+    assert "circuit_breaker_state" in output
+    assert 'dependency="slack-security"' in output
+    assert "event_id" not in output
 
 
 @pytest.mark.asyncio

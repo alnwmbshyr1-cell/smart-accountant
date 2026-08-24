@@ -790,3 +790,10 @@
 - [x] إضافة مورد Circuit Breaker قابل لإعادة الاستخدام مع single-flight
 - [x] إضافة اختبارات الوحدة والتكامل والضغط للحالات والفشل المتزامن
 - [x] تحديث المهارة والتوثيق والتحقق ثم مزامنة Pull Request
+
+
+## Circuit Breaker Prometheus metrics
+- [x] تعريف metrics منخفضة cardinality لحالات الدائرة ونتائج الاستدعاءات
+- [x] إضافة Metrics collector وFastAPI /metrics instrumentation
+- [x] إضافة اختبارات المقاييس وعدم تسريب labels عالية cardinality
+- [x] تحديث المهارة والتوثيق والتحقق ومزامنة Pull Request
