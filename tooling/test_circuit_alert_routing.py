@@ -27,7 +27,8 @@ def test_alertmanager_has_immediate_pagerduty_and_webhook_routes():
     routes = document["route"]["routes"]
     names = {route["receiver"] for route in routes if 'alertname="CircuitBreakerOpen"' in route["matchers"]}
     assert names == {"smart-accountant-circuit-pagerduty", "smart-accountant-circuit-webhook"}
-    for route in routes[:2]:
+    circuit_routes = [route for route in routes if 'alertname="CircuitBreakerOpen"' in route["matchers"]]
+    for route in circuit_routes:
         assert route["group_wait"] == "0s"
         assert route["continue"] is True
 

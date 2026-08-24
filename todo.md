@@ -867,3 +867,10 @@
 - [x] تحديث Dashboard Grafana بلوحات أداء Collector والتنبيهات
 - [x] إضافة اختبارات Dashboard وPromQL وغياب labels عالية cardinality
 - [x] تحديث المهارة والتوثيق والتحقق ومزامنة Pull Request
+
+
+## Advanced Collector alert routing
+- [x] تعريف قواعد Prometheus للذاكرة والطوابير والرفض وفشل التصدير وغياب Collector
+- [x] إضافة Alertmanager routing مخصص حسب severity مع deduplication وinhibition
+- [x] إضافة اختبارات YAML وPromQL وpromtool وغياب الأسرار
+- [x] تحديث المهارة والتوثيق والتحقق ومزامنة Pull Request

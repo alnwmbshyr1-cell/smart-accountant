@@ -11,6 +11,23 @@ route:
   repeat_interval: 4h
   routes:
     - matchers:
+        - category="observability"
+        - severity="critical"
+      receiver: smart-accountant-circuit-pagerduty
+      group_by: [alertname, component, exporter, receiver]
+      group_wait: 0s
+      group_interval: 5m
+      repeat_interval: 1h
+      continue: true
+    - matchers:
+        - category="observability"
+      receiver: smart-accountant-observability
+      group_by: [alertname, component, exporter, receiver]
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 4h
+      continue: false
+    - matchers:
         - alertname="CircuitBreakerOpen"
       receiver: smart-accountant-circuit-pagerduty
       group_wait: 0s
@@ -85,6 +102,12 @@ receivers:
       - url_file: /etc/alertmanager/secrets/ops_webhook_url
         send_resolved: true
 
+  - name: smart-accountant-observability
+    webhook_configs:
+      - url_file: /etc/alertmanager/secrets/observability_webhook_url
+        send_resolved: true
+        max_alerts: 20
+
   - name: smart-accountant-security-webhook
     webhook_configs:
       - url_file: /etc/alertmanager/secrets/security_webhook_url
@@ -111,6 +134,12 @@ receivers:
         max_alerts: 10
 
 inhibit_rules:
+  - source_matchers:
+      - alertname="OTelCollectorMemoryCritical"
+    target_matchers:
+      - alertname="OTelCollectorMemoryPressure"
+    equal: [service_instance_id, component]
+
   - source_matchers:
       - alertname="SmartAccountantBackendDown"
     target_matchers:
