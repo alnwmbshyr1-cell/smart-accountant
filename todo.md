@@ -776,3 +776,10 @@
 - [ ] كتابة Redis Stream Worker مع Consumer Group وretry وDLQ
 - [ ] إضافة اختبارات للعقد الأمني والتكرار وإعادة المحاولة
 - [ ] توثيق إدارة مفاتيح HMAC والحدود الإنتاجية للنموذج
+
+
+## Sorted Set delayed retry and Worker tests
+- [ ] استبدال انتظار العامل بجدولة retry في Redis Sorted Set
+- [ ] إضافة claim ذري للرسائل الجاهزة وإعادة إدخالها إلى Stream
+- [ ] إضافة اختبارات Pytest وFakeRedis للوحدة والتكامل والتنافس
+- [ ] تحديث توثيق retry والاختبارات والمهارة

@@ -9,10 +9,23 @@ import time
 import unittest
 from pathlib import Path
 from urllib.request import Request, urlopen
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 
 ROOT = Path(__file__).resolve().parents[1]
 SERVER = ROOT / "backend/ops/continuous_alert_webhook.py"
+
+
+def wait_for_server(server, port):
+    deadline = time.time() + 3
+    while time.time() < deadline:
+        if server.poll() is not None:
+            raise RuntimeError(f"webhook server exited with {server.returncode}")
+        try:
+            with urlopen(f"http://127.0.0.1:{port}/healthz", timeout=0.2):
+                return
+        except (URLError, ConnectionError):
+            time.sleep(0.05)
+    raise TimeoutError("webhook server did not become ready")
 
 
 def signed_request(port, secret, payload, event_id, timestamp=None):
@@ -36,7 +49,7 @@ class ContinuousWebhookIntegrationTests(unittest.TestCase):
             env = {**os.environ, "CONTINUOUS_WEBHOOK_SECRET": secret, "CONTINUOUS_EVENTS_PATH": str(events), "WEBHOOK_PORT": str(port)}
             server = subprocess.Popen([sys.executable, str(SERVER)], env=env)
             try:
-                time.sleep(0.15)
+                wait_for_server(server, port)
                 payload = {"status": "firing", "alerts": [{"labels": {"alertname": "DeadlockBurst", "severity": "critical"}}]}
                 with urlopen(signed_request(port, secret, payload, "event-1"), timeout=2) as response:
                     self.assertEqual(response.status, 202)
@@ -55,7 +68,7 @@ class ContinuousWebhookIntegrationTests(unittest.TestCase):
             env = {**os.environ, "CONTINUOUS_WEBHOOK_SECRET": secret, "CONTINUOUS_EVENTS_PATH": str(Path(tmp) / "events.jsonl"), "WEBHOOK_PORT": str(port)}
             server = subprocess.Popen([sys.executable, str(SERVER)], env=env)
             try:
-                time.sleep(0.15)
+                wait_for_server(server, port)
                 payload = {"status": "firing", "alerts": []}
                 bad = signed_request(port, "wrong-secret", payload, "bad")
                 with self.assertRaises(HTTPError) as error:

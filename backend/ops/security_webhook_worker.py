@@ -26,6 +26,7 @@ except ImportError:  # Metrics are optional for the small local example.
 
 STREAM = os.getenv("SECURITY_STREAM", "security:webhook:events")
 DLQ_STREAM = os.getenv("SECURITY_DLQ_STREAM", "security:webhook:dead-letter")
+RETRY_ZSET = os.getenv("SECURITY_RETRY_ZSET", "security:webhook:retry-at")
 GROUP = os.getenv("SECURITY_CONSUMER_GROUP", "security-delivery")
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/15")
 MAX_SKEW = int(os.getenv("WEBHOOK_MAX_SKEW_SECONDS", "300"))
@@ -89,6 +90,7 @@ class HttpNotifier:
 class Settings:
     stream: str = STREAM
     dlq_stream: str = DLQ_STREAM
+    retry_zset: str = RETRY_ZSET
     group: str = GROUP
     max_attempts: int = MAX_ATTEMPTS
 
@@ -190,6 +192,30 @@ async def deliver(notifier: Notifier, payload: dict[str, Any], channel: str) -> 
     if delivery_success: delivery_success.labels(channel).inc()
 
 
+async def schedule_retry(settings: Settings, fields: dict[str, str], attempt: int, delay_seconds: float) -> None:
+    """Put a serialized job in a score-by-due-time index; never sleep in a worker."""
+    member = json.dumps({**fields, "attempts": str(attempt)}, ensure_ascii=False, sort_keys=True)
+    await redis_client.zadd(settings.retry_zset, {member: time.time() + delay_seconds})
+
+
+PROMOTE_DUE_LUA = """
+local members = redis.call('ZRANGEBYSCORE', KEYS[1], '-inf', ARGV[1], 'LIMIT', 0, ARGV[2])
+for _, member in ipairs(members) do
+  if redis.call('ZREM', KEYS[1], member) == 1 then
+    local obj = cjson.decode(member)
+    redis.call('XADD', KEYS[2], '*', 'event_id', obj.event_id, 'payload', obj.payload, 'attempts', obj.attempts, 'channel', obj.channel)
+  end
+end
+return #members
+"""
+
+
+async def promote_due_retries(settings: Settings, limit: int = 100) -> int:
+    """Atomically claim due ZSET members and re-enqueue them to the Stream."""
+    promoted = await redis_client.eval(PROMOTE_DUE_LUA, 2, settings.retry_zset, settings.stream, str(time.time()), str(limit))
+    return int(promoted or 0)
+
+
 async def move_to_dlq(settings: Settings, message_id: str, fields: dict[str, str], reason: str) -> None:
     fields = {**fields, "dead_letter_reason": reason, "dead_lettered_at": str(int(time.time()))}
     await redis_client.xadd(settings.dlq_stream, fields)
@@ -200,7 +226,8 @@ async def move_to_dlq(settings: Settings, message_id: str, fields: dict[str, str
 async def worker_loop(notifier: Notifier, settings: Settings = Settings()) -> None:
     await ensure_group(settings)
     while True:
-        batches = await redis_client.xreadgroup(settings.group, CONSUMER, {settings.stream: ">"}, count=10, block=5_000)
+        await promote_due_retries(settings)
+        batches = await redis_client.xreadgroup(settings.group, CONSUMER, {settings.stream: ">"}, count=10, block=1_000)
         if not batches:
             continue
         for _, messages in batches:
@@ -216,9 +243,9 @@ async def worker_loop(notifier: Notifier, settings: Settings = Settings()) -> No
                     if attempts >= settings.max_attempts:
                         await move_to_dlq(settings, message_id, {**fields, "attempts": str(attempts)}, f"retry_exhausted:{exc}")
                     else:
-                        await redis_client.xadd(STREAM, {**fields, "attempts": str(attempts), "next_attempt_at": str(int(time.time() + min(300, 2 ** attempts + random.random())))})
+                        delay = min(300, 2 ** attempts + random.random())
+                        await schedule_retry(settings, fields, attempts, delay)
                         await redis_client.xack(settings.stream, settings.group, message_id)
-                        await asyncio.sleep(min(30, 2 ** attempts + random.random()))
                 except (KeyError, json.JSONDecodeError) as exc:
                     await move_to_dlq(settings, message_id, {**fields, "attempts": str(attempts)}, f"invalid_message:{exc}")
                 if queue_depth:
