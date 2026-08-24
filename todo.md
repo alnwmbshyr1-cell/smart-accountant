@@ -888,3 +888,10 @@
 - [x] إضافة اختبار تكاملي لـfiring وresolved وrouting
 - [x] إضافة تحقق inhibition وgrouping وغياب أسرار الإنتاج
 - [x] تحديث المهارة والتوثيق والتحقق ومزامنة Pull Request
+
+
+## Alertmanager PR integration gate
+- [x] إضافة Workflow يعمل مع Pull Request ويفعّل Compose المحلي المعزول
+- [x] تشغيل integration harness والتحقق من firing وresolved وrouting
+- [x] رفع logs وJSON artifacts عند الفشل مع timeout وcleanup مضمون
+- [x] تحديث المهارة والتوثيق واختبارات Workflow والتحقق ومزامنة Pull Request

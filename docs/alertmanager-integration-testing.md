@@ -48,7 +48,13 @@ docker compose \
 
 ## CI
 
-شغّل الاختبارات الثابتة في كل Pull Request. شغّل Compose integration job في runner مع Docker عند تغييرات Prometheus أو Alertmanager. ارفع logs وJSON artifacts عند الفشل، واستخدم retention قصيراً. لا تستخدم secrets الإنتاج، ولا تفعّل job تلقائياً على بيئة الإنتاج؛ اجعلها محلية أو على GitHub Environment اختبارية.
+يعمل Workflow `.github/workflows/alertmanager-integration-pr.yml` تلقائياً مع كل Pull Request يغيّر ملفات Prometheus أو Alertmanager أو Compose أو Synthetic tooling. يبدأ Job على runner مع Docker، يشغل الاختبارات الثابتة، يرفع Compose محلياً، ينتظر readiness، ثم ينفذ `integration_test_alertmanager.py` للتحقق من firing وresolved وrouting.
+
+استخدم `timeout-minutes` وconcurrency cancellation لمنع تراكم Jobs قديمة، و`if: always()` لرفع JSON evidence، و`if: failure()` لجمع logs و`docker compose ps`. يجب أن ينفذ cleanup عبر `down -v --remove-orphans` حتى عند الفشل. اجعل صلاحية workflow `contents: read` فقط، ولا تضف secrets أو kubeconfig أو PagerDuty routing keys.
+
+يمكن جعل check المطلوب في Branch Protection بعد التأكد من ثبات اسم Job. احتفظ باختبار Staging أو الاختبار الذي يرسل إلى PagerDuty الحقيقي في Workflow منفصل مع GitHub Environment محمي وموافقة يدوية. لا تخلط synthetic local gate مع chaos أو production notification tests.
+
+شغّل الاختبارات الثابتة في كل Pull Request، وارفع logs وJSON artifacts عند الفشل مع retention قصير. لا تستخدم secrets الإنتاج، ولا تفعّل Job تلقائياً على بيئة الإنتاج؛ اجعلها محلية أو على GitHub Environment اختبارية.
 
 ## References
 
