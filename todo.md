@@ -860,3 +860,10 @@
 - [x] إضافة فلترة وإزالة الحقول الحساسة مع إعداد Collector إنتاجي
 - [x] إضافة اختبارات YAML وPII redaction وsampling/resource limits
 - [x] تحديث المهارة والتوثيق والتحقق ومزامنة Pull Request
+
+
+## OpenTelemetry Collector Grafana observability
+- [x] تحديد مقاييس Collector للطوابير والذاكرة والرفض والتصدير وsampling
+- [x] تحديث Dashboard Grafana بلوحات أداء Collector والتنبيهات
+- [x] إضافة اختبارات Dashboard وPromQL وغياب labels عالية cardinality
+- [x] تحديث المهارة والتوثيق والتحقق ومزامنة Pull Request

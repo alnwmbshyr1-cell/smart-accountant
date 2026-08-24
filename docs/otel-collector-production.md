@@ -31,7 +31,20 @@
 
 ## مؤشرات المراقبة
 
-راقب ذاكرة Collector، refused spans، queue size، exporter failures، traces sampled، traces dropped، وlatency. عند الضغط، خفّض baseline sampling أولاً، ولا تتنازل عن error وsecurity وChaos traces. اختبر توقف exporter للتأكد من أن فشل telemetry لا يوقف FastAPI أو Workers.
+أضف إلى Dashboard Grafana لوحات منفصلة لأداء Collector نفسه، ولا تخلطها مع لوحات Redis وCircuit Breaker التطبيقية. استخدم المقاييس التالية بعد التأكد من أسمائها في إصدار Collector المنشور:
+
+```promql
+max by (service_instance_id) (otelcol_process_memory_rss_bytes)
+max by (service_instance_id, exporter) (otelcol_exporter_queue_size)
+max by (service_instance_id, exporter) (100 * otelcol_exporter_queue_size / clamp_min(otelcol_exporter_queue_capacity, 1))
+sum by (receiver, transport) (rate(otelcol_receiver_refused_spans_total[5m]))
+sum by (processor) (rate(otelcol_processor_dropped_spans_total[5m]))
+sum by (exporter) (rate(otelcol_exporter_send_failed_spans_total[5m]))
+```
+
+راقب ذاكرة Collector، refused spans، queue size، exporter failures، traces sampled، traces dropped، والـlatency. أنشئ تنبيهاً عند queue utilization فوق 90% لمدة 10 دقائق، أو RSS فوق budget، أو refused spans غير صفري لمدة 5 دقائق، أو غياب scrape. عند الضغط، خفّض baseline sampling أولاً، ولا تتنازل عن error وsecurity وChaos traces. اختبر توقف exporter للتأكد من أن فشل telemetry لا يوقف FastAPI أو Workers.
+
+تُضاف هذه اللوحات إلى Dashboard `redis-stream-circuit-breaker.json` في panels 30–35، وتشمل RSS، queue size/capacity، refused/dropped/failed telemetry، sampling decisions، error rate، وqueue utilization.
 
 ## التحقق
 
