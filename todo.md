@@ -779,7 +779,7 @@
 
 
 ## Sorted Set delayed retry and Worker tests
-- [ ] استبدال انتظار العامل بجدولة retry في Redis Sorted Set
-- [ ] إضافة claim ذري للرسائل الجاهزة وإعادة إدخالها إلى Stream
-- [ ] إضافة اختبارات Pytest وFakeRedis للوحدة والتكامل والتنافس
+- [x] استبدال انتظار العامل بجدولة retry في Redis Sorted Set
+- [x] إضافة claim ذري للرسائل الجاهزة وإعادة إدخالها إلى Stream
+- [x] إضافة اختبارات Pytest وFakeRedis للوحدة والتكامل والتنافس
 - [ ] تحديث توثيق retry والاختبارات والمهارة
