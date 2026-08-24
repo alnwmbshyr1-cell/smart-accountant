@@ -748,3 +748,10 @@
 - [x] التحقق من deduplication وtestid وredaction داخل payloads
 - [x] ربط التشغيل مع fixtures وact دون Slack أو GitHub API حقيقي
 - [x] تحديث المهارة والتوثيق والتحقق والدفع
+
+
+## Daily Unified Test and Security Report
+- [x] إضافة مجمع يومي لنتائج الاختبارات التكاملية وSAST/DAST/Trivy وCoverage
+- [x] إضافة Workflow مجدول مع تقرير Markdown وJSON منقح
+- [x] إضافة إرسال Slack وEmail مع idempotency وحماية الأسرار
+- [x] إضافة اختبارات التقرير وتحديث المهارة والتحقق والدفع
