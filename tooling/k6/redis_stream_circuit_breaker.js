@@ -9,6 +9,7 @@ const duration = __ENV.DURATION || '60s';
 const secret = __ENV.TEST_WEBHOOK_SECRET || 'local-only-secret';
 const forceFailure = __ENV.FORCE_DOWNSTREAM_FAILURE === 'true';
 const allowNonLocal = __ENV.ALLOW_NON_LOCAL_LOAD_TEST === 'true';
+const chaosExperimentId = __ENV.CHAOS_EXPERIMENT_ID || '';
 
 if (!allowNonLocal && !/^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/.test(baseUrl)) {
   throw new Error('Refusing non-local load target. Set ALLOW_NON_LOCAL_LOAD_TEST=true only for approved staging.');
@@ -73,6 +74,7 @@ export default function () {
       'X-Webhook-Timestamp': timestamp,
       'X-Webhook-Signature': `sha256=${signature}`,
       'X-Load-Test': 'true',
+      ...(chaosExperimentId ? { 'X-Chaos-Experiment-Id': chaosExperimentId } : {}),
     },
     tags: { scenario: 'redis_stream_circuit_breaker' },
   });

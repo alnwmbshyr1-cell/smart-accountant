@@ -846,3 +846,10 @@
 - [x] إضافة مشغّل Chaos محمي يعزل Redis ويضمن الاستعادة
 - [x] إضافة Workflow واختبارات تمنع التشغيل خارج Staging وتجمع الأدلة
 - [x] تحديث المهارة والتوثيق وGrafana والتحقق ومزامنة Pull Request
+
+
+## Distributed tracing for Redis chaos
+- [x] تعريف spans وattributes آمنة لطلبات FastAPI وWorkers وRedis
+- [x] إضافة OpenTelemetry instrumentation وJaeger exporter/configuration
+- [x] ربط trace IDs بتجربة Redis outage وإضافة اختبارات collector والتسريب
+- [x] تحديث المهارة والتوثيق وGrafana والتحقق ومزامنة Pull Request
