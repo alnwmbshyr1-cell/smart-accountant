@@ -818,3 +818,10 @@
 - [x] إضافة سكربت Load Testing قابل للضبط يحفز Circuit Open
 - [x] إضافة تحليل نتائج واختبارات تمنع استهداف الإنتاج أو labels عالية cardinality
 - [x] تحديث المهارة والتوثيق ولوحة Grafana والتحقق ومزامنة Pull Request
+
+
+## Kubernetes autoscaling from Redis Stream depth
+- [x] تحديد عتبة عمق Redis Stream وقيم min/max replicas وسياسة scale down
+- [x] إضافة Deployment وScaledObject KEDA مع Redis TLS وSecret reference
+- [x] إضافة اختبارات manifests وتحديث Dashboard Grafana بمؤشرات HPA/KEDA
+- [x] تحديث المهارة والتوثيق والتحقق ومزامنة Pull Request
