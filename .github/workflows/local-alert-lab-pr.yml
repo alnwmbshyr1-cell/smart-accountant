@@ -1,0 +1,99 @@
+name: Local Alert Lab PR
+
+on:
+  pull_request:
+    paths:
+      - 'backend/ops/alert-lab/**'
+      - 'backend/ops/prometheus/**'
+      - 'backend/ops/alertmanager/**'
+      - 'tooling/test_local_alertmanager_slack_lab.py'
+      - 'docs/local-alertmanager-slack-lab.md'
+      - '.github/workflows/local-alert-lab-pr.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  static-validation:
+    name: Static alert lab validation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run alert lab unit checks
+        run: python -m unittest tooling/test_local_alertmanager_slack_lab.py
+      - name: Validate JSON dashboards
+        run: python -m json.tool backend/ops/grafana/smart-accountant-load-dashboard.json >/dev/null
+
+  runtime-validation:
+    name: Runtime firing and resolved validation
+    needs: static-validation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Compose model
+        run: docker compose -f backend/ops/alert-lab/docker-compose.yml config --quiet
+      - name: Start local alert lab
+        run: |
+          mkdir -p backend/ops/alert-lab/received
+          docker compose -f backend/ops/alert-lab/docker-compose.yml up -d
+      - name: Wait for Prometheus and Alertmanager
+        run: |
+          set -euo pipefail
+          for url in http://127.0.0.1:9090/-/ready http://127.0.0.1:9093/-/ready; do
+            for attempt in $(seq 1 30); do
+              curl -fsS "$url" >/dev/null && break
+              test "$attempt" -lt 30 || { echo "Service not ready: $url" >&2; exit 1; }
+              sleep 2
+            done
+          done
+      - name: Trigger synthetic firing state
+        run: |
+          docker compose -f backend/ops/alert-lab/docker-compose.yml stop metrics
+          docker compose -f backend/ops/alert-lab/docker-compose.yml run -d \
+            --name sa-alert-lab-metrics \
+            -e ALERT_LAB_HIGH=1 \
+            -e TEST_ID=pr-${{ github.event.pull_request.number || github.run_id }} \
+            metrics
+      - name: Assert firing alert reached local receiver
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 30); do
+            grep -q '"status": "firing"' backend/ops/alert-lab/received/events.jsonl 2>/dev/null && break
+            test "$attempt" -lt 30 || { docker compose -f backend/ops/alert-lab/docker-compose.yml logs; exit 1; }
+            sleep 2
+          done
+          ! grep -Eiq 'bearer|authorization|api[_-]?key|password|secret' backend/ops/alert-lab/received/events.jsonl
+      - name: Trigger resolved state
+        run: |
+          docker rm -f sa-alert-lab-metrics
+          docker compose -f backend/ops/alert-lab/docker-compose.yml start metrics
+      - name: Assert resolved alert reached local receiver
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 30); do
+            grep -q '"status": "resolved"' backend/ops/alert-lab/received/events.jsonl 2>/dev/null && exit 0
+            test "$attempt" -lt 30 || { docker compose -f backend/ops/alert-lab/docker-compose.yml logs; exit 1; }
+            sleep 2
+          done
+      - name: Collect logs
+        if: always()
+        run: docker compose -f backend/ops/alert-lab/docker-compose.yml logs > /tmp/alert-lab-compose-logs.txt || true
+      - name: Upload diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-alert-lab-diagnostics-${{ github.run_id }}
+          path: |
+            backend/ops/alert-lab/received/
+            /tmp/alert-lab-compose-logs.txt
+          if-no-files-found: ignore
+      - name: Tear down lab
+        if: always()
+        run: docker compose -f backend/ops/alert-lab/docker-compose.yml down -v

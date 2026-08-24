@@ -685,3 +685,10 @@
 - [x] اختبار firing وresolved وتنبيه p95 وidempotency للـfingerprint
 - [x] توثيق أوامر التشغيل وعدم استخدام Slack الإنتاجي
 - [x] تحديث المهارة والتحقق والدفع
+
+
+## PR Alert Lab CI
+- [x] إضافة Workflow يعمل مع كل Pull Request لتشغيل مختبر التنبيهات المحلي
+- [x] اختبار firing وresolved والتحقق من payload المنقح
+- [x] رفع logs وartifacts عند الفشل فقط دون أسرار
+- [x] تحديث المهارة والتوثيق والتحقق والدفع
