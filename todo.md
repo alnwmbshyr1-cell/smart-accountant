@@ -772,14 +772,14 @@
 
 
 ## Redis Stream Worker and HMAC replay hardening
-- [ ] كتابة نموذج FastAPI لاستقبال Webhook والتحقق من HMAC وtimestamp
-- [ ] كتابة Redis Stream Worker مع Consumer Group وretry وDLQ
-- [ ] إضافة اختبارات للعقد الأمني والتكرار وإعادة المحاولة
-- [ ] توثيق إدارة مفاتيح HMAC والحدود الإنتاجية للنموذج
+- [x] كتابة نموذج FastAPI لاستقبال Webhook والتحقق من HMAC وtimestamp
+- [x] كتابة Redis Stream Worker مع Consumer Group وretry وDLQ
+- [x] إضافة اختبارات للعقد الأمني والتكرار وإعادة المحاولة
+- [x] توثيق إدارة مفاتيح HMAC والحدود الإنتاجية للنموذج
 
 
 ## Sorted Set delayed retry and Worker tests
 - [x] استبدال انتظار العامل بجدولة retry في Redis Sorted Set
 - [x] إضافة claim ذري للرسائل الجاهزة وإعادة إدخالها إلى Stream
 - [x] إضافة اختبارات Pytest وFakeRedis للوحدة والتكامل والتنافس
-- [ ] تحديث توثيق retry والاختبارات والمهارة
+- [x] تحديث توثيق retry والاختبارات والمهارة
