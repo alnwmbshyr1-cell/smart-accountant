@@ -20,5 +20,5 @@ Future<void> main() async {
     tools.configureCloud(Supabase.instance.client);
   }
 
-  runApp(AccountingApp(database: database, tools: tools));
+  runApp(AccountingApp(database: database));
 }
