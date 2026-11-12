@@ -1,16 +1,42 @@
-# smart_accountant
+# دفتر المحاسبة — Smart Accountant
 
-A new Flutter project.
+تطبيق Flutter عربي RTL لإدارة دليل الحسابات والقيود المزدوجة والأطراف والمخزون وفواتير البيع والشراء. التخزين محلي أولًا عبر SQLite؛ مزامنة Supabase اختيارية بصيغة snapshot للحساب المسجل.
 
-## Getting Started
+## التشغيل المحلي
 
-This project is a starting point for a Flutter application.
+يتطلب المشروع Flutter المتوافق مع `pubspec.yaml` وAndroid/iOS toolchains:
 
-A few resources to get you started if this is your first Flutter project:
+```bash
+flutter doctor
+flutter pub get
+flutter analyze
+flutter test
+flutter run
+```
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+## إعداد Supabase للمزامنة السحابية
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+1. أنشئ مشروع Supabase وفعّل تسجيل المستخدمين بالبريد أو مزود هوية تختاره.
+2. شغّل SQL الموجود في `supabase/migrations/20261112010000_accounting_cloud_snapshots.sql` عبر Supabase SQL Editor.
+3. مرر عنوان المشروع والمفتاح العام فقط عند التشغيل:
+
+```bash
+flutter run \
+  --dart-define=SUPABASE_URL=https://YOUR_PROJECT.supabase.co \
+  --dart-define=SUPABASE_PUBLISHABLE_KEY=YOUR_PUBLIC_PUBLISHABLE_KEY
+```
+
+لا تضع `service_role` أو أسرارًا في التطبيق. RLS تحصر النسخة السحابية في `auth.uid()` للمستخدم المصادق. يجب تسجيل الدخول أولًا؛ طلب المزامنة يرفع snapshot كاملًا إلى صف واحد للمستخدم، ولا يدمج تغييرات الأجهزة ولا يزامن لحظيًا. استعادة النسخة السحابية استبدال كامل للبيانات المحلية؛ نفّذ نسخة احتياطية قبلها. أضف واجهة تسجيل دخول Supabase واختبر سياسات RLS بحسابين قبل بيانات حقيقية.
+
+## وظائف محلية
+
+- قيود يومية متوازنة بأعداد صحيحة في أصغر وحدة للعملة.
+- عملاء/موردون، أصناف، فواتير بسيطة، تحديث المخزون، وميزان مراجعة وتقارير دخل/تدفق.
+- إعدادات الشركة، معدلات صرف قابلة للتحرير، نسخ JSON واستعادة، PDF وExcel.
+- قفل بالبصمة يمكن تفعيله على الأجهزة المدعومة.
+
+## ضوابط جاهزية الإنتاج
+
+هذه نسخة أولية وليست نظامًا ماليًا معتمدًا. معدلات العملات الأولية placeholders بقيمة 1 وليست أسعار سوق. يلزم إدخال أسعار حقيقية موثقة وتسجيل سعر الصرف بتاريخ كل معاملة قبل المحاسبة متعددة العملات. ملفات النسخ المحلية ولقطات السحابة غير مشفرة على مستوى التطبيق؛ لا تخزن بيانات حساسة قبل اعتماد تشفير ومراجعة الخصوصية. تقرير PDF الحالي لا يضمن تشكيل العربية لأن تضمين خط عربي/تشكيل النص لم يكتمل. كذلك تتطلب المعالجة الضريبية والفواتير الإلكترونية تهيئة حسب قانون كل بلد.
+
+قبل النشر: شغّل `flutter analyze`, `flutter test` وبناء Android/iOS؛ أضف اختبارات القيود والفواتير والاستعادة، مراجعة RLS، تشفير النسخ وقاعدة البيانات، migrations رجعية، وسياسة تدقيق/إلغاء قيود دون حذفها. هذه الأوامر لا يمكن تشغيلها من واجهة GitHub API.
